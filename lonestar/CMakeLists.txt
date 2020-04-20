@@ -1,4 +1,4 @@
-add_library(lonestar STATIC src/BoilerPlate.cpp)
+add_library(lonestar STATIC src/BoilerPlate.cpp patternmining/PatternMining.cpp)
 
 target_include_directories(lonestar PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -27,6 +27,7 @@ add_subdirectory(preflowpush)
 add_subdirectory(sssp)
 add_subdirectory(surveypropagation)
 add_subdirectory(triangles)
+add_subdirectory(patternmining)
 add_subdirectory(tutorial_examples)
 add_subdirectory(ktruss)
 add_subdirectory(louvainClustering)
