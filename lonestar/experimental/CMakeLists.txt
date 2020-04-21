@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.15)
 add_subdirectory(barneshut)
 #add_subdirectory(bc-inner)
 add_subdirectory(betweennesscentrality)

@@ -19,11 +19,11 @@
 #include <unordered_set>
 
 // bliss headers
-#include "defs.hh"
-#include "graph.hh"
-#include "utils.hh"
-#include "bignum.hh"
-#include "uintseqhash.hh"
+#include "bliss-0.73/defs.hh"
+#include "bliss-0.73/graph.hh"
+#include "bliss-0.73/utils.hh"
+#include "bliss-0.73/bignum.hh"
+#include "bliss-0.73/uintseqhash.hh"
 
 typedef unsigned VertexId;
 typedef float Weight;

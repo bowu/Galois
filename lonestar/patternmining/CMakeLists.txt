@@ -12,7 +12,8 @@ set(sources
   PatternMining.cpp
 )
 
-add_compile_options(-Wno-sign-compare)
+add_compile_options(-Wno-sign-compare -fopenmp)
+add_link_options(-Wno-sign-compare -fopenmp)
 add_executable(patternmining ${sources})
 add_dependencies(apps patternmining)
 target_link_libraries(patternmining PRIVATE Galois::shmem lonestar)

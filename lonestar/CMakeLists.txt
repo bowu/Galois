@@ -31,4 +31,5 @@ add_subdirectory(patternmining)
 add_subdirectory(tutorial_examples)
 add_subdirectory(ktruss)
 add_subdirectory(louvainClustering)
+add_subdirectory(kcl)
 
