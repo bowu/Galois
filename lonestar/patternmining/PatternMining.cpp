@@ -308,6 +308,9 @@ int main(int argc, char** argv) {
             edgeIteratingAlgo(graph);
             break;
 
+//         case loadbalance:
+//             loadBalanceAlgo(graph);
+
         default:
             std::cerr << "Unknown algo: " << algo << "\n";
     }

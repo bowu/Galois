@@ -12,10 +12,14 @@ set(sources
   PatternMining.cpp
 )
 
+add_compile_options(-std=c++17)
+add_subdirectory(googletest)
+add_subdirectory(test)
 add_compile_options(-Wno-sign-compare -fopenmp)
 add_link_options(-Wno-sign-compare -fopenmp)
 add_executable(patternmining ${sources})
 add_dependencies(apps patternmining)
+add_dependencies(apps patternmining_test)
 target_link_libraries(patternmining PRIVATE Galois::shmem lonestar)
 install(TARGETS patternmining DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
 
