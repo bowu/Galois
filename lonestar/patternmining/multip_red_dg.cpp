@@ -3,20 +3,19 @@
 /**
  * Inserts the reduced execution plan into the vector
  * Should be a way to have the automorphism already integrated at this point,
- * but whatever
  */
 void MultiRed::reduced(std::vector<int> &ord,std::vector<int> &restrictions){
   /*DirectedGraphlet d = dg.reorder(d);
-  for(int i=0;i<n;++i){
-    //reorder dg
-    }*/
+    for(int i=0;i<n;++i){
+  //reorder dg
+  }*/
   /*
-    for(int x : ord)
-    std::cout<<x<<",";
-    std::cout<<std::endl;
-  
-    std::cout<<std::endl;
-  */  
+     for(int x : ord)
+     std::cout<<x<<",";
+     std::cout<<std::endl;
+
+     std::cout<<std::endl;
+     */  
   //apply ord onto restrictions
   DirectedGraphlet dg(n);
   //add a bunch of edges
@@ -26,19 +25,19 @@ void MultiRed::reduced(std::vector<int> &ord,std::vector<int> &restrictions){
       if(i==j)continue;
       //restriction application
       if(ord[i]==restrictions[ord[j]]){
-	applied_restrictions[j] = i;
-	assert(i<j);
-	//std::cout<<"added restriction "<< j << " "<<i<<std::endl;
+        applied_restrictions[j] = i;
+        assert(i<j);
+        //std::cout<<"added restriction "<< j << " "<<i<<std::endl;
       }
       //edges
       if(i<j){
-	if(g.adjacency[ord[i]].find(ord[j])!=g.adjacency[ord[i]].end()){
-	  dg.add_edge(j,i,true);
-	  //std::cout<<"added edge "<<i<<" "<<j<<std::endl;	  
-	}
-	else {
-	  dg.add_edge(j,i,false);
-	}
+        if(g.adjacency[ord[i]].find(ord[j])!=g.adjacency[ord[i]].end()){
+          dg.add_edge(j,i,true);
+          //std::cout<<"added edge "<<i<<" "<<j<<std::endl;	  
+        }
+        else {
+          dg.add_edge(j,i,false);
+        }
       }
     }
   }
@@ -99,7 +98,7 @@ void MultiRed::process_all(std::vector<int> &restrictions,
     for(int j:g.adjacency.at(x)){
       //if it hasn't already been processed, add it to the list
       if(used.find(j)==used.end()){
-	rem.insert(j);
+        rem.insert(j);
       }
     }
     //recurse

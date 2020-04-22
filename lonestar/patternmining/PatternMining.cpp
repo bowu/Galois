@@ -47,6 +47,12 @@ enum Algo {
     edgeiterator
 };
 
+enum MiningApp {
+  clique = 0,
+  motif,
+  pattern
+};
+
 namespace cll = llvm::cl;
 static cll::opt<std::string>
         inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -56,6 +62,18 @@ static cll::opt<Algo> algo(
                     clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator (default)")
         ),
         cll::init(Algo::edgeiterator));
+
+static cll::opt<MiningApp> miningApp(
+        "app", cll::desc("Choose a mining app:"),
+        cll::values(clEnumValN(MiningApp::clique, "clique", "Clique counting"),
+                    clEnumValN(MiningApp::motif, "motif", "Motif counting"),
+                    clEnumValN(MiningApp::pattern, "pattern", "Pattern Matching")
+        ),
+        cll::init(MiningApp::clique));
+
+static cll::opt<unsigned int> patternSize("patternSize", cll::desc("Set a pattern size"), cll::init(0));
+
+static cll::opt<std::string> patternFileName("patternFile", cll::desc("Specify the pattern filename"), cll::value_desc("pattern filename"), cll::init(""));
 
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<
         true>::type ::with_no_lockable<true>::type Graph;
@@ -255,68 +273,115 @@ void makeGraph(Graph& graph, const std::string& triangleFilename) {
 }
 
 void readGraph(Graph& graph) {
-    if (inputFilename.find(".gr.triangles") !=
-        inputFilename.size() - strlen(".gr.triangles")) {
-        // Not directly passed .gr.triangles file
-        std::string triangleFilename = inputFilename + ".triangles";
-        std::ifstream triangleFile(triangleFilename.c_str());
-        if (!triangleFile.good()) {
-            // triangles doesn't already exist, create it
-            galois::StatTimer Trelabel("GraphRelabelTimer");
-            galois::gPrint("WARNING: Sorted graph does not exist; Relabelling and Creating a sorted graph\n");
-            Trelabel.start();
-            makeGraph(graph, triangleFilename);
-            Trelabel.stop();
-        } else {
-            // triangles does exist, load it
-            galois::graphs::readGraph(graph, triangleFilename);
-        }
+  if (inputFilename.find(".gr.triangles") !=
+      inputFilename.size() - strlen(".gr.triangles")) {
+    // Not directly passed .gr.triangles file
+    std::string triangleFilename = inputFilename + ".triangles";
+    std::ifstream triangleFile(triangleFilename.c_str());
+    if (!triangleFile.good()) {
+      // triangles doesn't already exist, create it
+      galois::StatTimer Trelabel("GraphRelabelTimer");
+      galois::gPrint("WARNING: Sorted graph does not exist; Relabelling and Creating a sorted graph\n");
+      Trelabel.start();
+      makeGraph(graph, triangleFilename);
+      Trelabel.stop();
     } else {
-        galois::graphs::readGraph(graph, inputFilename);
+      // triangles does exist, load it
+      galois::graphs::readGraph(graph, triangleFilename);
     }
+  } else {
+    galois::graphs::readGraph(graph, inputFilename);
+  }
 
-    size_t index = 0;
-    for (GNode n : graph) {
-        graph.getData(n) = index++;
-    }
+  size_t index = 0;
+  for (GNode n : graph) {
+    graph.getData(n) = index++;
+  }
 }
 
 int main(int argc, char** argv) {
-    galois::SharedMemSys G;
-    LonestarStart(argc, argv, name, desc, url);
+  galois::SharedMemSys G;
+  LonestarStart(argc, argv, name, desc, url);
 
-    Graph graph;
+  Graph graph;
 
-    galois::StatTimer Tinitial("GraphReadingTime");
-    Tinitial.start();
-    readGraph(graph);
-    Tinitial.stop();
+  galois::StatTimer Tinitial("GraphReadingTime");
+  Tinitial.start();
+  readGraph(graph);
+  Tinitial.stop();
 
-    galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
-                                  galois::runtime::pagePoolSize());
-    galois::reportPageAlloc("MeminfoPre");
+  galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
+      galois::runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
 
-    galois::StatTimer T;
-    T.start();
-    // case by case preAlloc to avoid allocating unnecessarily
-    switch (algo) {
-        case nodeiterator:
-            nodeIteratingAlgo(graph);
-            break;
+  std::vector<Graphlet> all;
+  switch(miningApp) {
+    case clique:
+      if(patternSize == 0) {
+        std::cerr << "Pattern size must be a positive integer.\n";
+        exit(1);
+      }
+      all.push_back(Graphlet::clique(patternSize));
+      break;
+    case motif:
+      if(patternSize == 0) {
+        std::cerr << "Pattern size must be a positive integer.\n";
+        exit(1);
+      }
+      all = Graphlet::all_connected(patternSize);
+      break;
+    case pattern:
+      if(patternFileName == "") {
+        std::cerr << "Must specify a pattern file name.\n";
+        exit(1);
+      }
+      all.push_back(Graphlet::from_file(patternFileName));
+      break;
+    default:
+      std::cerr << "Must specify a mining app.\n";
+  }
 
-        case edgeiterator:
-            edgeIteratingAlgo(graph);
-            break;
+  int total = 0;
+  std::vector<std::vector<ExecutionPlan>> planss;
+  for(unsigned int i=0; i< all.size(); ++i){
+    std::vector<ExecutionPlan> plans;
+    MultiRed mr(all.at(i),plans);
+    planss.push_back(plans);
+    total += plans.size();
+  }
 
-//         case loadbalance:
-//             loadBalanceAlgo(graph);
+  //best plans
+  MultiRestPlan mrp(0);
+  //worst plans
+  MultiRestPlan mrw(0);
 
-        default:
-            std::cerr << "Unknown algo: " << algo << "\n";
+  for(unsigned int i=0;i<planss.size();++i){
+    std::vector<ExecutionPlan> plans = planss.at(i);
+    printf("%lu plans for graph %d = \n",plans.size(),i);
+    //std::cout<<all[i].toString()<<std::endl;
+    double bestcomplex = std::numeric_limits<double>::infinity();
+    int bindex = 0;
+    int windex = 0;
+    double worstcomplex = 0;
+    for(unsigned int j=0;j<plans.size();++j){
+      RestPlan test(plans[j],i);
+      double comple = test.time_complexity();
+      //std::cout<<"plan "<<j<<" for graphlet "<<i<<" has expected complexity "<<comple<<std::endl;
+      if(comple<bestcomplex){
+        bindex=j;
+        bestcomplex = comple;
+      }
+      if(comple>worstcomplex){
+        windex=j;
+        worstcomplex = comple;
+      }
     }
-    T.stop();
-
-    galois::reportPageAlloc("MeminfoPost");
-    return 0;
+    std::cout<<"Chose plan "<<bindex<<" as best for graphlet "<<i<<std::endl;
+    mrp.add_ex_plan(plans[bindex],i);
+    std::cout<<"Chose plan "<<windex<<" as worst for graphlet "<<i<<std::endl;
+    mrw.add_ex_plan(plans[windex],i);
+  }
+  galois::reportPageAlloc("MeminfoPost");
+  return 0;
 }
 

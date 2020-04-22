@@ -21,6 +21,7 @@ ExecutionPlan::ExecutionPlan(DirectedGraphlet &g) : vertices(g.vertices), restri
     else d.second.insert(src);
   }
 }
+
 ExecutionPlan::ExecutionPlan(DirectedGraphlet &g, std::vector<int> rest) : vertices(g.vertices), restrictions(rest),depend(g.vertices) {
   for(auto t : g.edgelist()) {
     int src, dst;
@@ -31,13 +32,13 @@ ExecutionPlan::ExecutionPlan(DirectedGraphlet &g, std::vector<int> rest) : verti
     else d.second.insert(src);
   }
   /*
-  for(int i=0;i<vertices;++i){
-    std::cout<<i<<":";
-    for(int x : depend.at(i).first)std::cout<<"+"<<x;
-    for(int x : depend.at(i).second)std::cout<<"-"<<x;
-    std::cout<<std::endl;
-  }
-  */
+     for(int i=0;i<vertices;++i){
+     std::cout<<i<<":";
+     for(int x : depend.at(i).first)std::cout<<"+"<<x;
+     for(int x : depend.at(i).second)std::cout<<"-"<<x;
+     std::cout<<std::endl;
+     }
+     */
 }
 
 std::string ExecutionPlan::toString() const {
@@ -68,6 +69,7 @@ std::string ExecutionPlan::toString() const {
   }
   return oss.str();
 }
+
 std::string ExecutionPlan::toCode() const {
   std::ostringstream oss;
   oss<<"uint64_t count = 0;"<<std::endl;
@@ -90,10 +92,10 @@ std::string ExecutionPlan::toCode() const {
     if(d.first.size() == 0) return ERR_STR;
     for(auto it = d.first.begin(); it != d.first.end(); ++it) {
       if(it != d.first.begin()){
-	oss << "intersection_"<<(count?"num(":"set(");
-	count=false;
+        oss << "intersection_"<<(count?"num(":"set(");
+        count=false;
       }
-	//oss << "N(v" << *it << ")"
+      //oss << "N(v" << *it << ")"
     }
     //if(d.first.size() == 0) return ERR_STR;
     int rest = restrictions.at(i+1);
@@ -101,38 +103,38 @@ std::string ExecutionPlan::toCode() const {
     for(auto it = d.first.begin(); it != d.first.end(); ++it) {
       if(it != d.first.begin()) oss << ", ";
       if(i==0 && *it == rest){
-	//only one thing
-	oss<<"bounded(g.N(v"<<*it<<"),"<< "v0)";
-	if(i==vertices-2)oss<<".size()";
-	continue;
+        //only one thing
+        oss<<"bounded(g.N(v"<<*it<<"),"<< "v0)";
+        if(i==vertices-2)oss<<".size()";
+        continue;
       }
       oss << "g.N(v" << *it << ")";
       if(it != d.first.begin()){
-	//i+1 is restricted by this one
-	if(*it == rest){
-	  oss<<",v"<<rest;
-	}
-	//i+1 is restricted by the original
-	if(delayedrest){
-	  oss<<",v"<<rest;
-	  delayedrest=false;
-	}
-	oss << ")";
+        //i+1 is restricted by this one
+        if(*it == rest){
+          oss<<",v"<<rest;
+        }
+        //i+1 is restricted by the original
+        if(delayedrest){
+          oss<<",v"<<rest;
+          delayedrest=false;
+        }
+        oss << ")";
       }
       else if(*it == rest){
-	delayedrest=  true;
+        delayedrest=  true;
       }
     }
     for(auto it = d.second.begin(); it != d.second.end(); ++it) {
       oss << ", g.N(v" << *it << ")";
       //i+1 is restricted by this one
       if(*it == rest){
-	oss<<",v"<<rest;
+        oss<<",v"<<rest;
       }
       //i+1 is restricted by the original
       if(delayedrest){
-	oss<<",v"<<rest;
-	  delayedrest=false;
+        oss<<",v"<<rest;
+        delayedrest=false;
       }
       oss << ")";
     }

@@ -1,10 +1,25 @@
 #include "def.h"
 #include<iostream>
 
-RestSet::RestSet(const std::vector<int>& i, const std::vector<int> &o,int rest) : ins(i), out(o), restrict(rest) {
+//restrictions should be the restrction vector of an execution plan
+RestSet::RestSet(const std::vector<int>& i, const std::vector<int>& o, const std::vector<int>& restrictions) : ins(i), out(o) {
   depth =0;
   if(i.size()>0) depth = std::max(depth, i[i.size()-1]);
   if(o.size()>0) depth = std::max(depth, o[o.size()-1]);
+  //std::copy(restrictions.begin(), restrictions.begin()+depth+2, back_inserter(restrict));
+  restrict = restrictions;
+  res_chain = std::vector<int>(depth+1, -1);
+  int t = depth+1;
+  while(restrictions[t] != -1) {
+//     std::cerr << "t: " << t << std::endl;
+    res_chain[t-1] = restrictions[t];
+//     std::cerr << "res_chain[t-1]: " << res_chain[t-1] << std::endl;
+    t = res_chain[t-1];
+    if(t <= 0) break;
+  }
+//   std::cout << "res_chain: (";
+//   std::copy(res_chain.begin(), res_chain.end(), std::ostream_iterator<int>(std::cout, " "));
+//   std::cout << ")\n";
   varname = var_name();
 }
 
@@ -15,6 +30,8 @@ bool RestSet::operator<(const RestSet& other) const{
   if(other.ins.size() > ins.size())return false;
   if(other.out.size() < out.size())return true;
   if(other.out.size() > out.size())return false;
+  if(other.res_chain.size() < res_chain.size()) return true;
+  if(other.res_chain.size() > res_chain.size()) return false;
 
   for(int i=0;i<ins.size();++i){
     if(other.ins.at(i) < ins.at(i)) return true;
@@ -24,9 +41,11 @@ bool RestSet::operator<(const RestSet& other) const{
     if(other.out.at(i) < out.at(i)) return true;
     if(other.out.at(i) > out.at(i)) return false;
   }
-  return restrict < other.restrict;//unrestricted happen first 
-  // return false;
-  //  return other.varname < varname;
+  for(int i=0;i<res_chain.size();++i) {
+    if(res_chain.at(i) < other.res_chain.at(i)) return true;
+    if(res_chain.at(i) > other.res_chain.at(i)) return false;
+  }
+  return false; 
 }
 
 std::string RestSet::var_name(){
@@ -35,11 +54,6 @@ std::string RestSet::var_name(){
   int ini =0;
   int oui =0;
   int i=0;
-  /*
-  if(ins.size() == 1 && restrict == -1 && out.size() == 0){
-    oss<<"g.N(v0)";
-    return oss.str();
-    }*/
   for(i=0;i<ins.size()+out.size();++i){
     if(oui<out.size() &&out[oui]==i){
       oss<<"n"<<i;
@@ -49,33 +63,39 @@ std::string RestSet::var_name(){
       oss<<"y"<<i;
       ++ini;
     }
-    //if(i==restrict) oss<<"f"<<restrict;
+    if(res_chain[i] >= 0) {
+      oss<<"f"<<res_chain[i];
+    }
   }
-  //ignore -1 restrict
-  if(restrict>=0) oss<<"f"<<restrict;
   return oss.str();
+}
+
+int RestSet::restriction() const{
+  return res_chain[depth];
 }
 
 //adjusting this function can change how performance ends up going.
 RestSet RestSet::parent() const{
+
+  RestSet parent = *this;
   //std::cout<<"CALLING PARENT FOR "<<varname<<std::endl;
   //highest variable value remaining
   int lastvar = ins[ins.size()-1];//
   if(out.size()>0)lastvar = std::max(lastvar,out[out.size()-1]);
-  if(restrict>=0){
-    return RestSet(ins,out,-1).parent();
-  }
   if(ins[ins.size()-1] == lastvar){
-    std::vector<int> nins(ins);
-    nins.pop_back();
-    return RestSet(nins,out,restrict);
+    parent.ins.pop_back();
+    parent.res_chain.pop_back();
+    parent.depth--;
+    parent.varname = parent.var_name();
+    return parent;
   }
   else {
-    std::vector<int> nout(out);
-    nout.pop_back();
-    return RestSet(ins,nout,restrict);
+    parent.out.pop_back();
+    parent.res_chain.pop_back();
+    parent.depth--;
+    parent.varname = parent.var_name();
+    return parent;
   }
-  //return nullptr;
 }
 
 bool RestSet::valid(){
@@ -84,68 +104,102 @@ bool RestSet::valid(){
 
 
 //available is what is available at that level already
-void RestSet::append_calc_to_stream(std::ostream& oss,bool numb,std::set<RestSet> &available) const{
+void RestSet::append_calc_to_stream(std::ostream& oss,int index,std::set<RestSet> &available) const{
+  static int transient_id = 100;
   RestSet par = parent();
-  if(!numb) {
-    NOGPU(oss << "VertexSet " << varname << " = ");
-  }
-  if(!numb && restrict!=-1){
-    RestSet testpar(ins,out,-1);
+  //not sure whether this will be executed in the new version
+  if(-1 == index && res_chain[depth]!=-1){
+    std::vector<int> rs(restrict);
+    RestSet testpar(ins,out,rs);
+    testpar.res_chain[depth] = -1;
+    testpar.varname = testpar.var_name();
     if(available.count(testpar)){
-      oss<<"bounded("<<testpar.varname<<",v"<<restrict<<");\n";
+      oss<< "VertexSet " << varname << " = bounded("<<testpar.varname<<",v"<<res_chain[depth]<<");\n";
       return;
     }
   }
   //std::cout<<varname<<" is a child of "<<par.varname<<std::endl;
   if(par.ins.size() == 0) { // has transient unnamed intermediate sets
     //bounded for 0
-    if(par.out.size()==0 && restrict == 0){
-      oss<<"bounded(y0,v0);\n";
+    if(par.out.size()==0){ 
+      //oss << "VertexSet " << varname << " = ";
+      if(res_chain[depth] ==0) {
+        oss << "VertexSet y0 = g.N(v0); ";
+        oss<< "VertexSet " << varname << " = bounded(y0,v0);\n";
+      }
+      else {
+        oss << "VertexSet y0 = g.N(v0);\n";
+      }
       return;
     }
     //we can't use the parent, it doesn't exist
     //just compute ourselves
-    //oss<<"VertexSet "<<varname<< " = ";
-    for(int i=0;i<out.size();++i) {
-      oss << "difference_" << ((numb && i==0) ? "num(" : "set(");
+    if(varname == "n0y1") {
+      std::cerr << "strange res_chain: ";
+      std::copy(res_chain.begin(), res_chain.end(), std::ostream_iterator<int>(std::cerr, " "));
+      std::cerr << std::endl;
     }
-    if(out.size()==0) {
-      NOGPU(oss << "g.N(v0)");
-    } else oss<< "y" << ins[0];
+      
+    if(out.size() != 0)
+      oss<<"VertexSet "<<varname<< "; ";
+    if(index>=0)
+      oss<<"counter["<<index<<"] += ";
+    for(int i=0;i<out.size();++i) {
+      if(index != -1 && i==0) {
+        oss << "difference_num(";
+      }
+      else {
+        oss << "difference_set(" << varname << ",";
+        if(varname == "n0y1")
+          std::cerr << "difference_set(" << varname << ",";
+      }
+    }
+    oss<< "y" << ins[0];
+    if(varname == "n0y1")
+      std::cerr << "y" << ins[0];
     for(int i=0;i<out.size();++i){
       oss<<", y"<<out[i]<<"";
-      if(i==0 && restrict!=-1) oss<<", v"<<restrict;
+      if(varname == "n0y1")
+        std::cerr << ", y" << out[i]<<"";
+      if(i==0 && res_chain[depth]!=-1) {
+        oss<<", v"<<res_chain[depth];
+        if(varname == "n0y1")
+          std::cerr << ", v" << out[i]<<"";
+      }
+      IFGPU(oss << ", local_indices, local_search, &manager, work_group");
       oss<<")";
+        if(varname == "n0y1")
+          std::cerr << ")\n";
     }
-    if(numb&& out.size()==0)oss<<".size()";
+    if(index!=-1 && out.size()==0)oss<<".size()";
     oss<<";\n";
     return;
   }
-  //if this is a bounded, and parent isn't, the difference is the bounding.
-  /*if(restrict!=-1 &&  ){
-    oss<<"VertexSet "<< varname << " = "
-       << "bounded("<<par.varname<<", v"<<restrict<<");\n";
-    return;
-    }*/
-  
-  //this set is a difference
 
+  if(index== -1) {
+    oss << "VertexSet " << varname << " = ";
+  } else {
+    oss<<"counter["<<index<<"] += ";
+  }
+  //this set is a difference
   if(out.size()!=par.out.size()){
-    oss<< "difference_"<< (numb ? "num(" : "set(")
+    oss<< "difference_"<< (index!=-1 ? "num(" : "set(")
        << par.varname << ", y" << out[out.size()-1];
-    if(restrict!=-1){
-      oss<<", v"<<restrict; 
+    if(res_chain[depth]!=-1){
+      oss<<", v"<<res_chain[depth]; 
     }
+    IFGPU(oss << ", local_indices, local_search, &manager, work_group");
     oss<<");\n";
     return;
   }
   //this set is an intersection
   if(ins.size()!=par.ins.size()){
-    oss<< "intersection_" << (numb?"num(":"set(")
+    oss<< "intersection_" << (index!=-1?"num(":"set(")
        <<par.varname<<", y"<<ins[ins.size()-1];
-    if(restrict!=-1){
-      oss<<", v"<<restrict; 
+    if(res_chain[depth]!=-1){
+      oss<<", v"<<res_chain[depth]; 
     }
+    IFGPU(oss << ", local_indices, local_search, &manager, work_group");
     oss<<");\n";
     return;
   }  
@@ -157,7 +211,7 @@ double RestSet::data_complexity_ignoring_restrictions() const{
   std::pair<std::set<int>,std::set<int>> dar(inset,outset);
   double xp = expected_size(dar);
   if(std::isnan(xp)){
-    std::cout<<"Nan from size" <<ins.size()<<" "<<out.size()<<" "<<restrict<<std::endl;
+    std::cout<<"Nan from size" <<ins.size()<<" "<<out.size()<<" "<<res_chain[depth]<<std::endl;
   }
   return expected_size(dar);
 }
@@ -171,8 +225,10 @@ double RestSet::time_complexity_ignoring_restrictions(bool numb,std::set<RestSet
   std::set<int> outset(out.begin(),out.end());
   std::pair<std::set<int>,std::set<int>> dar(inset,outset);
   */
-  if(!numb && restrict!=-1){
-    RestSet testpar(ins,out,-1);
+  if(!numb && res_chain[depth]!=-1){
+    std::vector<int> rs(restrict);
+    rs[depth] = -1;
+    RestSet testpar(ins,out,rs);
     if(available.count(testpar)==1){
       //basically nothing, we just do it bounded
       return 0;//std::min(64,restset.data_complexity_ignoring_restrictions());
@@ -190,3 +246,4 @@ double RestSet::time_complexity_ignoring_restrictions(bool numb,std::set<RestSet
   //  std::cout<<data_complexity_ignoring_restrictions();
   return parent().data_complexity_ignoring_restrictions();
 }
+

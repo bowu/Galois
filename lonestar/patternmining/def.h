@@ -3,6 +3,8 @@
 #include <set>
 #include <tuple>
 #include <algorithm>
+#include <iterator>
+#include <iostream>
 
 #include <sstream>
 #include <cassert>
@@ -20,6 +22,7 @@
   #define IFGPU(expression)
   #define NOGPU(expression) expression
 #endif
+
 
 double expected_size(const std::pair<std::set<int>, std::set<int>> &clause);
 
@@ -86,6 +89,9 @@ public:
   //larger than j's degree.
   std::vector<int> restrictions;//-1 wherever it doesn't exist
   //depend indicates the structure of the graphlet
+  //the first set determines the set intersections to perform and the second set the
+  //difference operations.
+  //For example, ({0,1,3}, {2}) means N(v0)&N(v1)&N(v3)-N(v2)
   std::vector<std::pair<std::set<int>, std::set<int>>> depend;
   ExecutionPlan();
   ExecutionPlan(DirectedGraphlet&);
@@ -161,18 +167,22 @@ public:
   std::vector<int> ins;
   //increasing order
   std::vector<int> out;
-  int restrict;
-  RestSet(const std::vector<int>&,const std::vector<int>&,int);
+  std::vector<int> restrict;
+  std::vector<int> res_chain;
+  RestSet(const std::vector<int>&, const std::vector<int>&, const std::vector<int>&);
   bool operator<(const RestSet&) const;
   std::string varname;
   bool valid();
+  //get the restriction at the current level
+  int restriction() const;
   //computes a parent, if it exists, otherwise returns self;
   RestSet parent() const;
-  void append_calc_to_stream(std::ostream&,bool number,std::set<RestSet>&)const;
+  void append_calc_to_stream(std::ostream&,int index,std::set<RestSet>&)const;
   
   double data_complexity_ignoring_restrictions() const;
   double time_complexity_ignoring_restrictions() const;
   double time_complexity_ignoring_restrictions(bool,std::set<RestSet>&) const;
+  friend std::ostream & operator<<(std::ostream & os, RestSet& rs) ;
 private:
   std::string var_name();
 };
@@ -180,9 +190,7 @@ private:
 class RestPlan {
 public:
   int id, vertices;
-private:
   std::vector<int> rest;
-public:
   RestPlan(ExecutionPlan&,int);
   //ExecutionPlan* parent;
   //first element is the set for v1
@@ -191,6 +199,8 @@ public:
   std::vector<std::set<RestSet>> depends;
   double data_complexity();
   double time_complexity();
+  friend std::ostream & operator<<(std::ostream & os, RestPlan & rp);
+
 };
 
 #include<map>
@@ -220,3 +230,17 @@ private:
   double rec_data_complexity(double,std::vector<int> &,std::vector<int>&);
   double rec_time_complexity(double,std::vector<int> &,std::vector<int>&);
 };
+
+template<class T>
+void print_vector(std::vector<T> &v);
+
+template<class T>
+void print_vector(const std::vector<T> &v);
+
+template<class T>
+void print_set(std::set<T> &v);
+
+std::ostream & operator<<(std::ostream & os, const RestSet& rs) ;
+std::ostream & operator<<(std::ostream & os, RestSet& rs) ;
+
+std::ostream & operator<<(std::ostream & os, RestPlan & rp);

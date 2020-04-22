@@ -5,15 +5,17 @@ RestPlan::RestPlan(ExecutionPlan& ep, int _id): id(_id), vertices(ep.vertices), 
   //construct the plans at each level for what we loop on
   //first element on loopon is the set for v1
   //first construct what they depend on, put them in 
-  //This loop implements set code motion
+  //This loop implements single-plan set operation motion
   for(int i= 1; i < ep.vertices;++i){
     std::vector<int> ins(ep.depend[i].first.begin(),ep.depend[i].first.end());
     std::vector<int> out(ep.depend[i].second.begin(),ep.depend[i].second.end());
-    loopons.emplace_back(ins,out,ep.restrictions[i]);
+//     std::vector<int> rs(ep.restrictions.begin()+1, ep.restrictions.end());
+//     loopons.emplace_back(ins,out,rs);
+    loopons.emplace_back(ins,out,ep.restrictions);
     depends.emplace_back();
     //don't include the last one
     //    std::cout<<i<<" "<<ep.vertices<<std::endl;
-    if(i!=ep.vertices-1)depends[i-1].insert(loopons[i-1]);
+    if(i!=ep.vertices-1) depends[i-1].insert(loopons[i-1]);
     
     RestSet curr = loopons[i-1].parent();
     while(curr.ins.size()>0){
@@ -23,6 +25,7 @@ RestPlan::RestPlan(ExecutionPlan& ep, int _id): id(_id), vertices(ep.vertices), 
     //    std::cout<<depends[i-1].size()<<std::endl;
   }
 }
+
 
 //expected memory allocated to vertex sets
 double RestPlan::data_complexity(){
@@ -77,7 +80,7 @@ double RestPlan::time_complexity(){
 	//std::cout<<j<<"has mult "<<multcounts[j]<<" at step "<<i<<std::endl;
 	inexpect/=multcounts[j];
       }
-    //double oldres=res;
+    double oldres=res;
     for(RestSet s: depends[i]){
       res+=s.time_complexity_ignoring_restrictions()*inexpect;
       

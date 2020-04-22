@@ -301,7 +301,7 @@ std::vector<DirectedGraphlet> DirectedGraphlet::acyc_can_vars() const {
       }
     }
     volatile bool is_unique = true;
-    //#pragma omp parallel for
+    #pragma omp parallel for
     for(int i = 0; i < vars.size(); i++) {
       if(is_unique && dg.isomorphic(vars.at(i))) {
         is_unique = false;

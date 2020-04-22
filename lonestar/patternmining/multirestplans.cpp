@@ -11,6 +11,7 @@ MultiRestPlan::~MultiRestPlan(){
 }
 void MultiRestPlan::add_ex_plan(ExecutionPlan& ep, int id){
   RestPlan rp(ep,id);
+//   std::cout << rp;
   add_rest_plan(rp);
 }
 
@@ -20,10 +21,18 @@ void MultiRestPlan::add_rest_plan(RestPlan& rp){
   MultiRestPlan* curr = this;
   int dep = 0;
   for(;dep<rp.loopons.size()-1;++dep){
+//     std::cout << "at level: " << dep << " inserts the following restsets:\n";
+//     for(auto rs : rp.depends[dep])
+//       std::cout << rs << "\n";
     curr->atlev.insert(rp.depends[dep].begin(),rp.depends[dep].end());
+//     std::cout << "at level: " << dep << " after inserts the restsets, atlev is:\n";
+//     for(auto rs : curr->atlev)
+//       std::cout << rs << "\n";
     RestSet lopon = rp.loopons[dep];
     if(curr->children.find(lopon)==curr->children.end()){
       curr->children[lopon] = new MultiRestPlan(dep+1); 
+//       std::cout << lopon;
+//       std::cout << "\ncreating a new multi rest plan\n";
     }
     curr = curr->children[lopon];
   }
@@ -41,11 +50,13 @@ void MultiRestPlan::add_rest_plan(RestPlan& rp){
   }
   ++npls;
 }
+
 std::pair<std::string, std::string> MultiRestPlan::to_code(){
   std::ostringstream oss1, oss2;
   append_to_stream(oss1, oss2);
   return { oss1.str(), oss2.str() };
 }
+
 void MultiRestPlan::append_to_stream(std::ostream &oss_head, std::ostream &oss){
   int fordepth = 0;
   int dynsize = 64;
@@ -73,21 +84,20 @@ void MultiRestPlan::append_to_stream(std::ostream &oss_head, std::ostream &oss){
   std::string tabdep = tabdepthoss.str();
 
   oss<<tabdep;
-  IFGPU(if(depth == 0) oss << "GPUVertexSet<GROUP_SIZE> y0 = N<GROUP_SIZE>(v0, vertices, edges);\n");
   bool first = true;
   for(auto restset : atlev ){
     if(first) first = false;
     else oss<<tabdep;
-    restset.append_calc_to_stream(oss,false,atlev);
+    restset.append_calc_to_stream(oss,-1,atlev);
   }
   //update all our counters
   first = true;
   for(auto counterpair : counters){
     if(first) first = false;
     else oss<<tabdep;
-    NOGPU(oss<<"counter["<<counterpair.second<<"] += ");
+    //NOGPU(oss<<"counter["<<counterpair.second<<"] += ");
     IFGPU(oss << "uint64_t local_counter_" << counterpair.second << " = ");
-    counterpair.first.append_calc_to_stream(oss,true,atlev);
+    counterpair.first.append_calc_to_stream(oss,counterpair.second,atlev);
     IFGPU(oss << tabdep << "if(work_group.thread_rank() == 0) atomicAdd(counter + " << counterpair.second << ", local_counter_" << counterpair.second << ");\n");
   }
   //go through all the loops
@@ -96,9 +106,7 @@ void MultiRestPlan::append_to_stream(std::ostream &oss_head, std::ostream &oss){
     oss<<tabdep;
     oss<<"for(vidType idx"<<(depth+1)<<" = 0; idx" << (depth+1) << " < " << m.first.varname << ".size(); idx" << (depth+1) << "++) {\n";
     NOGPU(oss << tabdep << "  vidType v" << (depth+1) << " = " << m.first.varname << ".begin()[idx" << (depth+1) << "];\n");
-    IFGPU(oss << tabdep << "  vidType v" << (depth+1) << " = " << m.first.varname << "[idx" << (depth+1) << "];\n");
     NOGPU(oss << tabdep << "  VertexSet y" << (depth+1) << " = g.N(v" << (depth+1) << ");\n");
-    IFGPU(oss << tabdep << "  GPUVertexSet<GROUP_SIZE> y" << (depth+1) << " = N<GROUP_SIZE>(v" << (depth+1) << ", vertices, edges);\n");
     m.second->append_to_stream(oss_head, oss);
     
     oss<<tabdep<<"}\n";
@@ -155,7 +163,7 @@ double MultiRestPlan::rec_data_complexity(double loopedness,std::vector<int> &re
     if(atlev.count(m.first)==0){
       res+=comploop*m.first.data_complexity_ignoring_restrictions();
     }
-    restrictions.push_back(m.first.restrict);
+    restrictions.push_back(m.first.restriction());
     multcounts.push_back(0);
     res+=m.second->rec_data_complexity(loopedness*m.first.data_complexity_ignoring_restrictions(),restrictions,multcounts);
     multcounts.pop_back();
@@ -211,7 +219,7 @@ double MultiRestPlan::rec_time_complexity(double loopedness,std::vector<int> &re
       res+=comploop*m.first.time_complexity_ignoring_restrictions(true,atlev);
     }
     //update restrictions to be processed by the child
-    restrictions.push_back(m.first.restrict);
+    restrictions.push_back(m.first.restriction());
     multcounts.push_back(0);
     res+=m.second->rec_time_complexity(loopedness*m.first.data_complexity_ignoring_restrictions(),restrictions,multcounts);
     multcounts.pop_back();
@@ -228,3 +236,4 @@ double MultiRestPlan::rec_time_complexity(double loopedness,std::vector<int> &re
   //return restrictions to how it was originally
   return res;
 }
+

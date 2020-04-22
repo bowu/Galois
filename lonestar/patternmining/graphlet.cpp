@@ -166,7 +166,7 @@ std::vector<Graphlet> Graphlet::all_connected(int n) {
           if(target[i]) g.add_edge(i, n-1);
         }
         volatile bool is_unique = true;
-        //#pragma omp parallel for
+        #pragma omp parallel for
         for(int i = 0; i < graphlets.size(); i++) {
           if(is_unique && g.isomorphic(graphlets.at(i))) {
             is_unique = false;
