@@ -163,8 +163,10 @@ public:
 class RestSet{
 public:
   int depth;
+  int bound;
   //increasing order
   std::vector<int> ins;
+  bool isIntersect;
   //increasing order
   std::vector<int> out;
   std::vector<int> restrict;
@@ -224,6 +226,8 @@ public:
   std::pair<std::string, std::string> to_code();
   double data_complexity();
   double time_complexity();
+  uint32_t numPlans() { return plans.size(); }
+  uint32_t totalDepth = 0;
 private:
   std::vector<RestPlan> plans;
   void append_to_stream(std::ostream&, std::ostream&);

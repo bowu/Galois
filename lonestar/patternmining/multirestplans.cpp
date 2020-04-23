@@ -19,8 +19,8 @@ void MultiRestPlan::add_rest_plan(RestPlan& rp){
   plans.push_back(rp);
   // DO what is needed to be done
   MultiRestPlan* curr = this;
-  int dep = 0;
-  for(;dep<rp.loopons.size()-1;++dep){
+  totalDepth = std::max(totalDepth, rp.loopons.size());
+  for(int dep = 0;dep<rp.loopons.size()-1;++dep){
 //     std::cout << "at level: " << dep << " inserts the following restsets:\n";
 //     for(auto rs : rp.depends[dep])
 //       std::cout << rs << "\n";
@@ -236,4 +236,3 @@ double MultiRestPlan::rec_time_complexity(double loopedness,std::vector<int> &re
   //return restrictions to how it was originally
   return res;
 }
-

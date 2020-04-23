@@ -36,7 +36,7 @@ private:
 
   //The following multiple functions need refactoring, but it should not affect
   //performance
-  SizeType intersectBufNoBoundSize(NodeTy* otherPtr, SizeType otherSize)
+  SizeType intersectBufNoBoundSize(NodeTy* otherPtr, SizeType otherSize) const
   {
     SizeType idx_l = 0, idx_r = 0, idx_out = 0;
     while(idx_l < setSize && idx_r < otherSize) {
@@ -227,29 +227,30 @@ public:
     }
   }
 
-  VertexSet(NodeTy *edgeBegin, NodeTy edgeListSize, NodeTy vid) : ptr(edgeBegin), setSize(edgeListSize), bufSize(edgeListSize), fromVid(vid), isLocalAlloc(false) { }
+  VertexSet(NodeTy* edgeBegin, NodeTy edgeListSize, NodeTy vid) : ptr(edgeBegin), setSize(edgeListSize), bufSize(edgeListSize), fromVid(vid), isLocalAlloc(false) { }
 
-  VertexSet(NodeTy* otherPtr, NodeTy otherSetSize, NodeTy bufSize, NodeTy otherVid, NodeTy up) 
-  {
-    ptr = otherPtr;
-    bufSize = bufSize;
-    isLocalAlloc = false;
-    if(otherSetSize > 64){
+  VertexSet(NodeTy* edgeBegin, NodeTy edgeListSize, NodeTy vid, NodeTy upper) : ptr(edgeBegin), bufSize(edgeListSize), fromVid(vid), isLocalAlloc(false) { 
+    ptr = edgeBegin;
+    if(edgeListSize> 64){
       NodeTy idx_l = -1;
-      NodeTy idx_r = otherSetSize;
+      NodeTy idx_r = edgeListSize;
       while(idx_r-idx_l > 1){
         NodeTy idx_t = (idx_l+idx_r)/2;
-        if(ptr[idx_t] < up)idx_l = idx_t;
+        if(ptr[idx_t] < upper)idx_l = idx_t;
         else idx_r = idx_t;
       }
       setSize = idx_l+1;
     }else{
       NodeTy idx_l = 0;
 
-      while(idx_l < setSize && ptr[idx_l] < up) ++idx_l;
+      while(idx_l < setSize && ptr[idx_l] < upper) ++idx_l;
       setSize = idx_l;
     }
-    fromVid = otherVid;
+  }
+
+  VertexSet(VertexSet &other, NodeTy up) 
+  {
+    VertexSet(other.ptr, other.setSize, other.fromVid, up);
   }
 
   ~VertexSet() {
@@ -260,6 +261,9 @@ public:
         delete[] ptr; 
     }
   }
+
+  NodeTy* begin() { return ptr; }
+  NodeTy* end() { return ptr+setSize; }
 
   VertexSet<NodeTy,false,useNumaAlloc>& intersectNoBound(VertexSet<NodeTy,false,useNumaAlloc> &dst, const VertexSet<NodeTy,true,useNumaAlloc> &other) {
     SizeType s = intersectBufNoBound(dst.ptr, other.ptr, other.setSize);
@@ -273,11 +277,11 @@ public:
     return dst;
   }
 
-  SizeType intersectNoBoundSize(const VertexSet<NodeTy,true,useNumaAlloc> &other) {
+  SizeType intersectNoBoundSize(const VertexSet<NodeTy,true,useNumaAlloc> &other) const {
     return intersectBufNoBoundSize(other.ptr, other.setSize); 
   }
 
-  SizeType intersectNoBoundSize(const VertexSet<NodeTy,false,useNumaAlloc> &other) {
+  SizeType intersectNoBoundSize(const VertexSet<NodeTy,false,useNumaAlloc> &other) const {
     return intersectBufNoBoundSize(other.ptr, other.setSize); 
   }
 
@@ -291,11 +295,11 @@ public:
     return dst;
   }
 
-  SizeType intersectWithBoundSize(const VertexSet<NodeTy,true,useNumaAlloc> &other, NodeTy up) {
+  SizeType intersectWithBoundSize(const VertexSet<NodeTy,true,useNumaAlloc> &other, NodeTy up) const {
     return intersectBufWithBoundSize(other.ptr, other.setSize, up);
   }
   
-  SizeType intersectWithBoundSize(const VertexSet<NodeTy,false,useNumaAlloc> &other, NodeTy up) {
+  SizeType intersectWithBoundSize(const VertexSet<NodeTy,false,useNumaAlloc> &other, NodeTy up) const {
     return intersectBufWithBoundSize(other.ptr, other.setSize, up);
   }
 
@@ -311,11 +315,11 @@ public:
     return dst;
   }
 
-  SizeType differenceNoBoundSize(const VertexSet<NodeTy,true,useNumaAlloc> &other) {
+  SizeType differenceNoBoundSize(const VertexSet<NodeTy,true,useNumaAlloc> &other) const {
     return differenceBufNoBoundSize(other.ptr, other.setSize, other.fromVid); 
   }
 
-  SizeType differenceNoBoundSize(const VertexSet<NodeTy,false,useNumaAlloc> &other) {
+  SizeType differenceNoBoundSize(const VertexSet<NodeTy,false,useNumaAlloc> &other) const {
     return differenceBufNoBoundSize(other.ptr, other.setSize, other.fromVid); 
   }
 
@@ -329,11 +333,11 @@ public:
     return dst;
   }
 
-  SizeType differenceWithBoundSize(const VertexSet<NodeTy,true,useNumaAlloc> &other, NodeTy up) {
+  SizeType differenceWithBoundSize(const VertexSet<NodeTy,true,useNumaAlloc> &other, NodeTy up) const {
     return differenceBufWithBoundSize(other.ptr, other.setSize, other.fromVid, up);
   }
   
-  SizeType differenceWithBoundSize(const VertexSet<NodeTy,false,useNumaAlloc> &other, NodeTy up) {
+  SizeType differenceWithBoundSize(const VertexSet<NodeTy,false,useNumaAlloc> &other, NodeTy up) const {
     return differenceBufWithBoundSize(other.ptr, other.setSize, other.fromVid, up);
   }
 

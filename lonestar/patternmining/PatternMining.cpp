@@ -28,6 +28,7 @@
 
 #include "galois/runtime/Profile.h"
 #include "def.h"
+#include "AutoMiner.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -41,7 +42,6 @@ const char* name = "Pattern Mining";
 const char* desc = "Mine an arbitrary pattern in a graph";
 const char* url  = 0;
 
-constexpr static const unsigned CHUNK_SIZE  = 64u;
 enum Algo {
     nodeiterator,
     edgeiterator
@@ -314,6 +314,8 @@ int main(int argc, char** argv) {
       galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
+  galois::StatTimer TGeneration("PlanGenerationTime");
+  TGeneration.start();
   std::vector<Graphlet> all;
   switch(miningApp) {
     case clique:
@@ -352,13 +354,9 @@ int main(int argc, char** argv) {
 
   //best plans
   MultiRestPlan mrp(0);
-  //worst plans
-  MultiRestPlan mrw(0);
 
   for(unsigned int i=0;i<planss.size();++i){
     std::vector<ExecutionPlan> plans = planss.at(i);
-    printf("%lu plans for graph %d = \n",plans.size(),i);
-    //std::cout<<all[i].toString()<<std::endl;
     double bestcomplex = std::numeric_limits<double>::infinity();
     int bindex = 0;
     int windex = 0;
@@ -378,9 +376,23 @@ int main(int argc, char** argv) {
     }
     std::cout<<"Chose plan "<<bindex<<" as best for graphlet "<<i<<std::endl;
     mrp.add_ex_plan(plans[bindex],i);
-    std::cout<<"Chose plan "<<windex<<" as worst for graphlet "<<i<<std::endl;
-    mrw.add_ex_plan(plans[windex],i);
   }
+
+  TGeneration.stop();
+
+  galois::StatTimer TExe("ExecutionTime");
+  TExe.start();
+  std::vector<size_t> counters;
+  AutoMiner am(&graph, mrp);
+  counters = am.count();
+  TExe.stop();
+
+  std::cout << "Counters: ";
+  for(auto c : counters) {
+    std::cout << c << ", ";
+  }
+  std::cout<<"\b\b\n";
+
   galois::reportPageAlloc("MeminfoPost");
   return 0;
 }

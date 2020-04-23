@@ -13,6 +13,7 @@ set(sources
 )
 
 add_compile_options(-std=c++17)
+add_compile_options(-fpermissive)
 add_subdirectory(googletest)
 add_subdirectory(test)
 add_compile_options(-Wno-sign-compare -fopenmp)

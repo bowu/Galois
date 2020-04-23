@@ -408,6 +408,8 @@ public:
 
   GraphNode getEdgeDst(edge_iterator ni) { return edgeDst[*ni]; }
 
+  GraphNode* getEdgeDstPtr(edge_iterator ni) { return &edgeDst[*ni]; }
+
   size_t size() const { return numNodes; }
   size_t sizeEdges() const { return numEdges; }
 

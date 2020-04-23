@@ -6,10 +6,15 @@ RestSet::RestSet(const std::vector<int>& i, const std::vector<int>& o, const std
   depth =0;
   if(i.size()>0) depth = std::max(depth, i[i.size()-1]);
   if(o.size()>0) depth = std::max(depth, o[o.size()-1]);
+  if(depth == i[i.size()-1])
+    isIntersect = true;
+  else 
+    isIntersect = false;
   //std::copy(restrictions.begin(), restrictions.begin()+depth+2, back_inserter(restrict));
   restrict = restrictions;
   res_chain = std::vector<int>(depth+1, -1);
   int t = depth+1;
+  bound = restrictions[t];
   while(restrictions[t] != -1) {
 //     std::cerr << "t: " << t << std::endl;
     res_chain[t-1] = restrictions[t];
@@ -76,7 +81,6 @@ int RestSet::restriction() const{
 
 //adjusting this function can change how performance ends up going.
 RestSet RestSet::parent() const{
-
   RestSet parent = *this;
   //std::cout<<"CALLING PARENT FOR "<<varname<<std::endl;
   //highest variable value remaining
