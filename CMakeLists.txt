@@ -31,14 +31,14 @@ set(REPORT_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communi
 set(REPORT_PER_ROUND_STATS OFF CACHE BOOL "Report statistics of each round of execution")
 set(NUM_TEST_GPUS "0" CACHE STRING "Number of test GPUs to use (on a single machine) for running the tests.")
 ###### General features ######
-set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(USE_HPCTK OFF CACHE BOOL "Use HPCToolKit for profiling")
 set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
-set(USE_LONGJMP_ABORT ON CACHE BOOL "Use longjmp instead of exceptions to signal aborts")
 set(USE_SANITIZER OFF CACHE BOOL "Use address and memory sanatizer")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
+set(USE_PANGOLIN OFF CACHE BOOL "Install pangolin apps as well as library")
+set(USE_GPU OFF CACHE BOOL "Build Galois with GPU support")
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
 set(USE_ARCH native CACHE STRING "Optimize for a specific processor architecture ('none' to disable)")
@@ -86,14 +86,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) #...without compiler extensions like gnu++11
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Always include debug info and aggressive warnings
-add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g;-Wall;-Wextra;-Werror>")
+# Always include debug info
+add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-g>")
 
 # GCC
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "gcc must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
 
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7 AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
     # GCC-{6,7} is a too imprecise
@@ -113,7 +115,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
     message(FATAL_ERROR "clang must be version 7 or higher. Found ${CMAKE_CXX_COMPILER_VERSION}.")
   endif()
-  
+
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
     # Avoid warnings from boost::counting_iterator
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
@@ -123,6 +127,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Werror>")
+
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-parameter>")
 endif()
 
@@ -147,11 +153,6 @@ if(ARCH_FLAGS_FOUND)
   add_link_options(${ARCH_LINK_FLAGS})
 endif()
 
-if(USE_GPROF)
-  add_compile_options(-pg)
-  add_link_options(-pg)
-endif(USE_GPROF)
-
 if(USE_SANITIZER)
   add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address;-fno-omit-frame-pointer;-fno-optimize-sibling-calls>")
 endif()
@@ -174,6 +175,7 @@ if(USE_EXP)
   set(USE_VTUNE ON)
   set(USE_PAPI ON)
   include_directories("libgalois/experimental/include")
+  include_directories("lonestar/include/pangolin")
   if(ENABLE_DIST_GALOIS)
     include_directories("libgluon/experimental/include")
   endif()
@@ -208,7 +210,6 @@ if(USE_EXP)
       add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-qtm;-qsmp=speculative>")
       set(GALOIS_USE_HTM on)
       set(GALOIS_USE_SEQ_ONLY on)
-      set(USE_LONGJMP_ABORT on)
     else()
       message(FATAL_ERROR "Hardware transactional memory not supported")
     endif()
@@ -241,21 +242,17 @@ if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
   message(FATAL_ERROR "Need huge pages")
 endif()
 
-if(USE_LONGJMP_ABORT)
-  set(GALOIS_USE_LONGJMP_ABORT ON)
-endif()
-
 find_package(Boost 1.58.0 REQUIRED COMPONENTS serialization iostreams)
 
 find_package(LLVM REQUIRED CONFIG)
 if("${LLVM_PACKAGE_VERSION}" VERSION_LESS "7")
-  MESSAGE(FATAL_ERROR "LLVM 7 or greater is required.")
+  message(FATAL_ERROR "LLVM 7 or greater is required.")
 endif()
 if(NOT DEFINED LLVM_ENABLE_RTTI)
-  MESSAGE(FATAL_ERROR "Could not determine if LLVM has RTTI enabled.")
+  message(FATAL_ERROR "Could not determine if LLVM has RTTI enabled.")
 endif()
 if(NOT ${LLVM_ENABLE_RTTI})
-  MESSAGE(FATAL_ERROR "Galois requires a build of LLVM that includes RTTI. Most package managers do this already, but if you built LLVM from source you need to configure it with `-DLLVM_ENABLE_RTTI=ON`")
+  message(FATAL_ERROR "Galois requires a build of LLVM that includes RTTI. Most package managers do this already, but if you built LLVM from source you need to configure it with `-DLLVM_ENABLE_RTTI=ON`")
 endif()
 target_include_directories(LLVMSupport INTERFACE ${LLVM_INCLUDE_DIRS})
 
@@ -264,80 +261,15 @@ include(CheckEndian)
 ###### Test Inputs ######
 
 if(GRAPH_LOCATION)
-  MESSAGE(STATUS "Using graph location ${GRAPH_LOCATION}")
+  message(STATUS "Using graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}/small_inputs")
 elseif(EXISTS /net/ohm/export/iss/inputs)
   set(BASEINPUT /net/ohm/export/iss/inputs)
   MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
 else()
   set(BASEINPUT ${PROJECT_BINARY_DIR}/inputs/small_inputs)
-  MESSAGE(STATUS "Use 'make input' to download inputs in the build directory")
+  message(STATUS "Use 'make input' to download inputs in the build directory")
 endif()
-
-###### Global Functions ######
-
-function(add_test_scale type app)
-  set(options NOT_QUICK)
-  set(one_value_args)
-  set(multi_value_args REQUIRES COMMAND_PREFIX)
-  cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
-
-  set(threads)
-  set(thr "${NUM_TEST_THREADS}")
-  while (${thr} GREATER 1)
-    list(APPEND threads ${thr})
-    math(EXPR thr "${thr} / 2")
-  endwhile()
-  list(APPEND threads "1")
-
-  foreach (thr ${threads})
-    set(name run-${type}-${app}-${thr})
-    add_test(NAME ${name} COMMAND ${app} ${X_UNPARSED_ARGUMENTS} -t ${thr})
-    if (NOT ${X_NOT_QUICK})
-      # Allow parallel tests
-      set_tests_properties(${name}
-        PROPERTIES ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1 LABELS quick)
-    endif()
-  endforeach()
-endfunction(add_test_scale)
-
-function(add_test_unit)
-  set(options)
-  set(one_value_args ADD_TARGET)
-  set(multi_value_args REQUIRES COMMAND_PREFIX)
-  cmake_parse_arguments(X "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
-
-  if(NOT ${APP_ADD_TARGET})
-    message(FATAL_ERROR "Missing required option ADD_TARGET to add_test_unit")
-  endif()
-
-  foreach(required ${X_REQUIRES})
-    if(${${required}} MATCHES "TRUE")
-    else()
-      message(STATUS "NOT compiling ${name} (missing: ${required})")
-      return()
-    endif()
-  endforeach()
-
-  set(name ${X_ADD_TARGET})
-  set(test_name unit-${name})
-
-  add_executable(${test_name} ${name}.cpp)
-  target_link_libraries(${test_name} galois_shmem lonestar)
-
-  set(commandline ${X_COMMAND_PREFIX})
-  list(APPEND commandline "$<TARGET_FILE:${test_name}>")
-  list(APPEND commandline ${X_UNPARSED_ARGUMENTS})
-
-  add_test(NAME ${test_name} COMMAND ${commandline})
-
-  # Allow parallel tests
-  set_tests_properties(${test_name}
-    PROPERTIES
-      ENVIRONMENT GALOIS_DO_NOT_BIND_THREADS=1
-      LABELS quick
-    )
-endfunction()
 
 ###### Source finding ######
 
@@ -346,7 +278,11 @@ add_custom_target(apps)
 
 # Core libraries (lib)
 add_subdirectory(libgalois)
-if (ENABLE_DIST_GALOIS)
+if(USE_PANGOLIN)
+  add_subdirectory(libpangolin)
+  add_subdirectory(lonestarmine)
+endif(USE_PANGOLIN)
+if(ENABLE_DIST_GALOIS)
   find_package(MPI REQUIRED)
   add_subdirectory(libdist)
   add_subdirectory(libcusp)
@@ -370,7 +306,6 @@ if (ENABLE_DIST_GALOIS)
 endif()
 
 add_subdirectory(scripts)
-add_subdirectory(test)
 add_subdirectory(inputs)
 add_subdirectory(tools)
 

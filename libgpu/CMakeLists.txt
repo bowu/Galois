@@ -6,8 +6,6 @@ add_dependencies(lib galois_gpu)
 target_sources(galois_gpu PRIVATE
   src/csr_graph.cu
   src/ggc_rt.cu
-  moderngpu/src/mgpucontext.cu
-  moderngpu/src/mgpuutil.cpp
 )
 
 target_include_directories(galois_gpu PUBLIC
@@ -16,7 +14,7 @@ target_include_directories(galois_gpu PUBLIC
 )
 install(
   DIRECTORY include/
-  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/galois/gpu"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/galois/gpu"
   COMPONENT dev
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN ".cuh"
 )
@@ -27,7 +25,7 @@ target_include_directories(galois_gpu PUBLIC
 )
 install(
   DIRECTORY moderngpu/include/
-  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/galois/gpu/moderngpu"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/galois/gpu/moderngpu"
   COMPONENT dev
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN ".cuh"
 )
@@ -38,7 +36,7 @@ target_include_directories(galois_gpu PUBLIC
 )
 install(
   DIRECTORY cub/
-  DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/galois/gpu/cub"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/galois/gpu/cub"
   COMPONENT dev
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp" PATTERN ".cuh"
 )
