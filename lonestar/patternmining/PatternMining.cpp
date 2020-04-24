@@ -384,10 +384,19 @@ int main(int argc, char** argv) {
 
   TGeneration.stop();
 
+  uint64_t maxDegree = 0;
+  for(GNode node : graph) {
+    Graph::edge_iterator ii = graph.edge_begin(node,galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ie = graph.edge_end(node,galois::MethodFlag::UNPROTECTED);
+    uint32_t numEdges = ie - ii;
+    if(maxDegree < numEdges)
+      maxDegree = numEdges;
+  }
+
   galois::StatTimer TExe("ExecutionTime");
   TExe.start();
   std::vector<size_t> counters;
-  AutoMiner am(&graph, mrp);
+  AutoMiner am(&graph, mrp, maxDegree);
   counters = am.count();
   TExe.stop();
 

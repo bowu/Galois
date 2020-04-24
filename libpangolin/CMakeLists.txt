@@ -8,7 +8,7 @@ set(sources
 
 add_library(pangolin STATIC ${sources})
 
-target_link_libraries(pangolin galois_shmem gllvm)
+target_link_libraries(pangolin galois_shmem llvm)
 
 target_include_directories(pangolin PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include

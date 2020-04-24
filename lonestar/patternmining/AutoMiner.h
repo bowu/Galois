@@ -130,17 +130,25 @@ enum MiningAlgo {
 
 class AutoMiner {
 public:
-  AutoMiner(Graph* g, MultiRestPlan& p) : graph(g), plan(p) { 
+  AutoMiner(Graph* g, MultiRestPlan& p, uint32_t d) : graph(g), plan(p), maxDegree(d) { 
     accums.resize(p.numPlans()); 
     path.resize(p.totalDepth);
     topVsBuf.resize(MultiRestPlan::allRestSets.size());
     otherVsBuf.resize(MultiRestPlan::allRestSets.size());
+    vsMemBuf.resize(otherVsBuf.size());
+    for(size_t i=0; i<otherVsBuf.size(); ++i)
+      vsMemBuf[i] = (uint32_t*)malloc(maxDegree*sizeof(uint32_t));
     for(auto p : MultiRestPlan::allRestSets) {
       std::cerr << "rs: " << p.first << "\n";
       std::cerr << "key: " << p.second << "\n";
       std::cerr << "key in rs: " << p.first.key<< "\n";
       std::cerr << "parent key: " << p.first.parentKey<< "\n";
     }
+  }
+
+  ~AutoMiner() {
+//     for(size_t i=0; i<vsMemBuf.size(); ++i)
+//       free(vsMemBuf[i]);
   }
 
   std::vector<size_t> count() {
@@ -207,7 +215,7 @@ private:
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
       uint32_t resultBufSize;
       resultBufSize = intersect ? std::min(set1->setSize,set2->setSize) : std::max(set1->setSize, set2->setSize);
-      std::unique_ptr<OtherLevelVS> result = std::make_unique<OtherLevelVS>(resultBufSize);
+      std::unique_ptr<OtherLevelVS> result = std::make_unique<OtherLevelVS>(vsMemBuf[rs.key],0,maxDegree,-1);
 
       if(intersect) {
         if(bound == -1) {
@@ -231,7 +239,7 @@ private:
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
       uint32_t resultBufSize;
       resultBufSize = intersect ? std::min(set1->setSize,set2->setSize) : std::max(set1->setSize, set2->setSize);
-      std::unique_ptr<OtherLevelVS> result = std::make_unique<OtherLevelVS>(resultBufSize);
+      std::unique_ptr<OtherLevelVS> result = std::make_unique<OtherLevelVS>(vsMemBuf[rs.key],0,maxDegree,-1);
 
       if(intersect) {
         if(bound == -1) {
@@ -311,7 +319,8 @@ private:
 //       std::cerr << "Recurse on: << " << node << ", loopon is: " << loopon;
 
       //otherMap[loopon] = computeVertexSet(node, loopon, topMap, otherMap); 
-      otherVsBuf[loopon.key] = computeVertexSet(node, loopon);
+      if(otherVsBuf[loopon.key] == nullptr)
+        otherVsBuf[loopon.key] = computeVertexSet(node, loopon);
       for(const RestSet rs : atlev)
         //otherMap[rs] = computeVertexSet(node, rs, topMap, otherMap);
         otherVsBuf[rs.key] = computeVertexSet(node, rs);
@@ -387,15 +396,12 @@ private:
         MultiRestPlan* mp;
 //         std::cout << "\nStart: " << n << ", ";
         path[0] = n;
+
         for( auto c : plan.children) {
           RestSet loopon = c.first;
           std::map<RestSet,int>& counters = c.second->counters;
           mp = c.second;
-          std::unique_ptr<TopLevelVS> loop;
-          if(loopon.res_chain[0] == 0)
-            loop = getVSFromNode(n, n);
-          else
-            loop = getVSFromNode(n, std::numeric_limits<uint32_t>::max());
+          std::unique_ptr<TopLevelVS>& loop = topVsBuf[loopon.key];
           for(uint32_t *ptr = loop->begin(); ptr!=loop->end(); ++ptr) {
             //depthRecurse(*ptr, mp->children, topVsMap, vsMap);
             depthRecurse(*ptr, mp->children);
@@ -415,6 +421,7 @@ private:
   Graph* graph;
   std::vector<std::unique_ptr<TopLevelVS> > topVsBuf;
   std::vector<std::unique_ptr<OtherLevelVS> > otherVsBuf;
+  std::vector<uint32_t*> vsMemBuf;
   std::vector<uint32_t> path;
   unsigned int depth = 0;
   MultiRestPlan& plan; 
@@ -422,6 +429,7 @@ private:
   std::vector<uint64_t> memBudget;
   std::vector<galois::GAccumulator<size_t>> accums;
   uint64_t reserved = 2*1024*1024*1024L; //by default reserve 2G space for data other than vertexset;
+  uint32_t maxDegree;
 };
 
 #endif
