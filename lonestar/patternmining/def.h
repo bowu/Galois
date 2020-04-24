@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <iterator>
 #include <iostream>
+#include <algorithm>
 
 #include <sstream>
 #include <cassert>
@@ -164,6 +165,8 @@ class RestSet{
 public:
   int depth;
   int bound;
+  std::vector<int> key;
+  std::vector<int> parentKey;
   //increasing order
   std::vector<int> ins;
   bool isIntersect;
@@ -227,7 +230,7 @@ public:
   double data_complexity();
   double time_complexity();
   uint32_t numPlans() { return plans.size(); }
-  uint32_t totalDepth = 0;
+  size_t totalDepth = 0;
 private:
   std::vector<RestPlan> plans;
   void append_to_stream(std::ostream&, std::ostream&);

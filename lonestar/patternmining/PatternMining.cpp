@@ -302,6 +302,7 @@ void readGraph(Graph& graph) {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
+  //galois::setActiveThreads(1);
 
   Graph graph;
 
@@ -310,9 +311,9 @@ int main(int argc, char** argv) {
   readGraph(graph);
   Tinitial.stop();
 
-  galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
-      galois::runtime::pagePoolSize());
-  galois::reportPageAlloc("MeminfoPre");
+//   galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
+//       galois::runtime::pagePoolSize());
+//   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer TGeneration("PlanGenerationTime");
   TGeneration.start();
@@ -323,6 +324,7 @@ int main(int argc, char** argv) {
         std::cerr << "Pattern size must be a positive integer.\n";
         exit(1);
       }
+      std::cout << "Clique counting with pattern size " << patternSize << std::endl;
       all.push_back(Graphlet::clique(patternSize));
       break;
     case motif:
@@ -330,6 +332,7 @@ int main(int argc, char** argv) {
         std::cerr << "Pattern size must be a positive integer.\n";
         exit(1);
       }
+      std::cout << "Motif counting with pattern size " << patternSize << std::endl;
       all = Graphlet::all_connected(patternSize);
       break;
     case pattern:
@@ -337,6 +340,7 @@ int main(int argc, char** argv) {
         std::cerr << "Must specify a pattern file name.\n";
         exit(1);
       }
+      std::cout << "Single pattern matching with file: " << patternFileName << std::endl;
       all.push_back(Graphlet::from_file(patternFileName));
       break;
     default:
@@ -393,7 +397,7 @@ int main(int argc, char** argv) {
   }
   std::cout<<"\b\b\n";
 
-  galois::reportPageAlloc("MeminfoPost");
+//   galois::reportPageAlloc("MeminfoPost");
   return 0;
 }
 

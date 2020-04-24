@@ -6,10 +6,14 @@ RestSet::RestSet(const std::vector<int>& i, const std::vector<int>& o, const std
   depth =0;
   if(i.size()>0) depth = std::max(depth, i[i.size()-1]);
   if(o.size()>0) depth = std::max(depth, o[o.size()-1]);
+
+
+  
   if(depth == i[i.size()-1])
     isIntersect = true;
   else 
     isIntersect = false;
+
   //std::copy(restrictions.begin(), restrictions.begin()+depth+2, back_inserter(restrict));
   restrict = restrictions;
   res_chain = std::vector<int>(depth+1, -1);
@@ -22,6 +26,22 @@ RestSet::RestSet(const std::vector<int>& i, const std::vector<int>& o, const std
     t = res_chain[t-1];
     if(t <= 0) break;
   }
+
+  for(auto ii : i)
+    key.push_back(ii);
+  parentKey = key;
+  if(isIntersect)
+    parentKey.pop_back();
+  for(auto oo : o) {
+    key.push_back(oo);
+    parentKey.push_back(oo);
+  }
+  if(!isIntersect)
+    parentKey.pop_back();
+  key.push_back(res_chain[depth]);
+  if(depth>0)
+    parentKey.push_back(res_chain[depth-1]);
+
 //   std::cout << "res_chain: (";
 //   std::copy(res_chain.begin(), res_chain.end(), std::ostream_iterator<int>(std::cout, " "));
 //   std::cout << ")\n";
@@ -109,7 +129,7 @@ bool RestSet::valid(){
 
 //available is what is available at that level already
 void RestSet::append_calc_to_stream(std::ostream& oss,int index,std::set<RestSet> &available) const{
-  static int transient_id = 100;
+//   static int transient_id = 100;
   RestSet par = parent();
   //not sure whether this will be executed in the new version
   if(-1 == index && res_chain[depth]!=-1){

@@ -80,7 +80,7 @@ double RestPlan::time_complexity(){
 	//std::cout<<j<<"has mult "<<multcounts[j]<<" at step "<<i<<std::endl;
 	inexpect/=multcounts[j];
       }
-    double oldres=res;
+//     double oldres=res;
     for(RestSet s: depends[i]){
       res+=s.time_complexity_ignoring_restrictions()*inexpect;
       

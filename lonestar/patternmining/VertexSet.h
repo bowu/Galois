@@ -220,7 +220,7 @@ public:
     setSize = s;
     bufSize = s;
     if(useNumaAlloc) {
-      std::cout << "allocating numa array...\n";
+//       std::cout << "allocating numa array...\n";
       ptr = (NodeTy*)numa_alloc_local(sizeof(NodeTy) * s);
     } else {
       ptr = new NodeTy[s];
@@ -236,14 +236,14 @@ public:
       NodeTy idx_r = edgeListSize;
       while(idx_r-idx_l > 1){
         NodeTy idx_t = (idx_l+idx_r)/2;
-        if(ptr[idx_t] < upper)idx_l = idx_t;
+        if(ptr[idx_t] < upper) idx_l = idx_t;
         else idx_r = idx_t;
       }
       setSize = idx_l+1;
     }else{
       NodeTy idx_l = 0;
 
-      while(idx_l < setSize && ptr[idx_l] < upper) ++idx_l;
+      while(idx_l < edgeListSize && ptr[idx_l] < upper) ++idx_l;
       setSize = idx_l;
     }
   }

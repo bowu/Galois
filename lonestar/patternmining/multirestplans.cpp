@@ -20,7 +20,8 @@ void MultiRestPlan::add_rest_plan(RestPlan& rp){
   // DO what is needed to be done
   MultiRestPlan* curr = this;
   totalDepth = std::max(totalDepth, rp.loopons.size());
-  for(int dep = 0;dep<rp.loopons.size()-1;++dep){
+  int dep = 0;
+  for(;dep<rp.loopons.size()-1;++dep){
 //     std::cout << "at level: " << dep << " inserts the following restsets:\n";
 //     for(auto rs : rp.depends[dep])
 //       std::cout << rs << "\n";
