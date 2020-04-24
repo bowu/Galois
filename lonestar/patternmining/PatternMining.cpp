@@ -302,7 +302,7 @@ void readGraph(Graph& graph) {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
-  //galois::setActiveThreads(1);
+  galois::setActiveThreads(1);
 
   Graph graph;
 

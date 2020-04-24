@@ -133,6 +133,14 @@ public:
   AutoMiner(Graph* g, MultiRestPlan& p) : graph(g), plan(p) { 
     accums.resize(p.numPlans()); 
     path.resize(p.totalDepth);
+    topVsBuf.resize(MultiRestPlan::allRestSets.size());
+    otherVsBuf.resize(MultiRestPlan::allRestSets.size());
+    for(auto p : MultiRestPlan::allRestSets) {
+      std::cerr << "rs: " << p.first << "\n";
+      std::cerr << "key: " << p.second << "\n";
+      std::cerr << "key in rs: " << p.first.key<< "\n";
+      std::cerr << "parent key: " << p.first.parentKey<< "\n";
+    }
   }
 
   std::vector<size_t> count() {
@@ -184,16 +192,18 @@ private:
     std::fill(memBudget.begin()+1,memBudget.end(),totalMemSize/(memBudget.size()-1));
   }
 
-  std::unique_ptr<OtherLevelVS> computeVertexSet(uint32_t node, const RestSet& rs, TopLevelVSMap& topMap, OtherLevelVSMap& otherMap) {
+  //std::unique_ptr<OtherLevelVS> computeVertexSet(uint32_t node, const RestSet& rs, TopLevelVSMap& topMap, OtherLevelVSMap& otherMap) {
+  std::unique_ptr<OtherLevelVS> computeVertexSet(uint32_t node, const RestSet& rs) {
 //     std::cerr << "\ncomputing vertex set for node: " << node << ", with rest set: " << rs;
     std::unique_ptr<TopLevelVS> set2 = getVSFromNode(node,std::numeric_limits<uint32_t>::max());
-    RestSet parent = rs.parent();
+//     RestSet parent = rs.parent();
     bool intersect = rs.isIntersect;
     int  bound     = rs.bound;
     if(rs.depth == 1) {
 //       std::cerr<< "\nCurrently in topMap:" << topMap;
 //       std::cerr << "\nparent is: " << parent;
-      std::unique_ptr<TopLevelVS>& set1 = topMap.at(parent);
+      //std::unique_ptr<TopLevelVS>& set1 = topMap.at(parent);
+      std::unique_ptr<TopLevelVS>& set1 = topVsBuf[rs.parentKey];
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
       uint32_t resultBufSize;
       resultBufSize = intersect ? std::min(set1->setSize,set2->setSize) : std::max(set1->setSize, set2->setSize);
@@ -215,7 +225,8 @@ private:
       return result;
     } else {
 //       std::cerr<< "\nCurrently in otherMap:" << otherMap;
-      std::unique_ptr<OtherLevelVS>& set1 = otherMap.at(parent);
+      //std::unique_ptr<OtherLevelVS>& set1 = otherMap.at(parent);
+      std::unique_ptr<OtherLevelVS>& set1 = otherVsBuf[rs.parentKey];
 //       std::cerr << "\nparent is: " << parent;
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
       uint32_t resultBufSize;
@@ -239,7 +250,8 @@ private:
     }
   }
 
-  void computeVertexSetSize(uint32_t node, RestSet rs, uint32_t index, TopLevelVSMap& topMap, OtherLevelVSMap& otherMap) {
+  //void computeVertexSetSize(uint32_t node, RestSet rs, uint32_t index, TopLevelVSMap& topMap, OtherLevelVSMap& otherMap) {
+  void computeVertexSetSize(uint32_t node, RestSet rs, uint32_t index) {
     std::unique_ptr<TopLevelVS> set2 = getVSFromNode(node,std::numeric_limits<uint32_t>::max());
 //     std::cerr << "\ncomputing vertex set size for node: " << node << ", with rest set: " << rs << std::endl;
     const RestSet parent = rs.parent();
@@ -247,7 +259,8 @@ private:
     int  bound     = rs.bound;
     if(rs.depth == 1) {
 //       std::cerr<< "Currently in topMap:" << topMap << std::endl;
-      std::unique_ptr<TopLevelVS>& set1 = topMap.at(parent);
+      //std::unique_ptr<TopLevelVS>& set1 = topMap.at(parent);
+      std::unique_ptr<TopLevelVS>& set1 = topVsBuf[rs.parentKey];
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
 //       std::cerr << "\n counter: " << accums[0].reduce();
       if(intersect) {
@@ -266,7 +279,8 @@ private:
 //       std::cerr << "\n counter changes to : " << accums[0].reduce();
     } else {
 //       std::cerr<< "Currently in otherMap:" << otherMap << std::endl;
-      std::unique_ptr<OtherLevelVS>& set1 = otherMap.at(parent);
+      //std::unique_ptr<OtherLevelVS>& set1 = otherMap.at(parent);
+      std::unique_ptr<OtherLevelVS>& set1 = otherVsBuf[rs.parentKey];
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
       if(intersect) {
         if(bound == -1) {
@@ -284,7 +298,8 @@ private:
     }
   }
 
-  void depthRecurse(GNode node, std::map<RestSet,MultiRestPlan*>& m, TopLevelVSMap& topMap, OtherLevelVSMap& otherMap){
+  //void depthRecurse(GNode node, std::map<RestSet,MultiRestPlan*>& m, TopLevelVSMap& topMap, OtherLevelVSMap& otherMap){
+  void depthRecurse(GNode node, std::map<RestSet,MultiRestPlan*>& m){
     path[++depth] = node;
     //std::cout << node << ", ";
     for(auto p : m)
@@ -295,23 +310,28 @@ private:
 
 //       std::cerr << "Recurse on: << " << node << ", loopon is: " << loopon;
 
-      otherMap[loopon] = computeVertexSet(node, loopon, topMap, otherMap); 
+      //otherMap[loopon] = computeVertexSet(node, loopon, topMap, otherMap); 
+      otherVsBuf[loopon.key] = computeVertexSet(node, loopon);
       for(const RestSet rs : atlev)
-        otherMap[rs] = computeVertexSet(node, rs, topMap, otherMap);
+        //otherMap[rs] = computeVertexSet(node, rs, topMap, otherMap);
+        otherVsBuf[rs.key] = computeVertexSet(node, rs);
 
       //std::cerr<< otherMap;
 
-      for(uint32_t *ptr = otherMap[loopon]->begin(); ptr!=otherMap[loopon]->end(); ++ptr) {
-        depthRecurse(*ptr, p.second->children, topMap, otherMap);
+      //for(uint32_t *ptr = otherMap[loopon]->begin(); ptr!=otherMap[loopon]->end(); ++ptr) {
+      for(uint32_t *ptr = otherVsBuf[loopon.key]->begin(); ptr!=otherVsBuf[loopon.key]->end(); ++ptr) {
+        depthRecurse(*ptr, p.second->children);
         for(auto cp : counters) {
-          computeVertexSetSize(*ptr, cp.first, cp.second, topMap, otherMap);
+          computeVertexSetSize(*ptr, cp.first, cp.second);
         }
       }
 
-
-      otherMap.erase(loopon);
-      for(RestSet rs : atlev)
-        otherMap.erase(rs);
+      //otherMap.erase(loopon);
+      otherVsBuf[loopon.key] = nullptr;
+      for(RestSet rs : atlev) {
+        //otherMap.erase(rs);
+        otherVsBuf[rs.key] = nullptr;;
+      }
     }
     --depth;
   }
@@ -339,17 +359,19 @@ private:
     galois::do_all(
       galois::iterate(*graph),
       [&](const GNode& n) {
-        TopLevelVSMap topVsMap;
+//         TopLevelVSMap topVsMap;
         //may improve performance to use a vector of maps
 //         std::vector<OtherLevelVSMap> vsMap(totalDepth-1);
-        OtherLevelVSMap vsMap; 
+//         OtherLevelVSMap vsMap; 
         //at top level, we should have 1 or 2 restsets
         for(RestSet rs : plan.atlev) {
           //std::cout << "*********************\n";
           if(rs.res_chain[0] == -1)  
-            topVsMap[rs] = getVSFromNode(n, std::numeric_limits<GNode>::max());
+            //topVsMap[rs] = getVSFromNode(n, std::numeric_limits<GNode>::max());
+            topVsBuf[rs.key] = getVSFromNode(n, std::numeric_limits<GNode>::max());
           else
-            topVsMap[rs] = getVSFromNode(n,n);
+            //topVsMap[rs] = getVSFromNode(n,n);
+            topVsBuf[rs.key] = getVSFromNode(n,n);
           //std::cout << rs;
           //std::cout << *(topVsMap[rs]);
           //std::cout << "*********************\n";
@@ -375,10 +397,12 @@ private:
           else
             loop = getVSFromNode(n, std::numeric_limits<uint32_t>::max());
           for(uint32_t *ptr = loop->begin(); ptr!=loop->end(); ++ptr) {
-            depthRecurse(*ptr, mp->children, topVsMap, vsMap);
+            //depthRecurse(*ptr, mp->children, topVsMap, vsMap);
+            depthRecurse(*ptr, mp->children);
             path[++depth] = *ptr;
             for(auto cp : counters) {
-              computeVertexSetSize(*ptr, cp.first, cp.second, topVsMap, vsMap);
+              //computeVertexSetSize(*ptr, cp.first, cp.second, topVsMap, vsMap);
+              computeVertexSetSize(*ptr, cp.first, cp.second);
             }
             --depth;
           }
@@ -389,6 +413,8 @@ private:
   }
 
   Graph* graph;
+  std::vector<std::unique_ptr<TopLevelVS> > topVsBuf;
+  std::vector<std::unique_ptr<OtherLevelVS> > otherVsBuf;
   std::vector<uint32_t> path;
   unsigned int depth = 0;
   MultiRestPlan& plan; 

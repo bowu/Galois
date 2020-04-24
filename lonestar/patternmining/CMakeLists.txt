@@ -22,5 +22,3 @@ add_executable(patternmining ${sources})
 add_dependencies(apps patternmining)
 add_dependencies(apps patternmining_test)
 target_link_libraries(patternmining PRIVATE Galois::shmem lonestar)
-install(TARGETS patternmining DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT apps EXCLUDE_FROM_ALL)
-

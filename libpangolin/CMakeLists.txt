@@ -24,6 +24,7 @@ target_include_directories(pangolin PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
   ${CMAKE_SOURCE_DIR}/libpangolin/include
+  ${CMAKE_SOURCE_DIR}/lonestar/include/pangolin
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 

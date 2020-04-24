@@ -7,8 +7,6 @@ RestSet::RestSet(const std::vector<int>& i, const std::vector<int>& o, const std
   if(i.size()>0) depth = std::max(depth, i[i.size()-1]);
   if(o.size()>0) depth = std::max(depth, o[o.size()-1]);
 
-
-  
   if(depth == i[i.size()-1])
     isIntersect = true;
   else 
@@ -26,21 +24,6 @@ RestSet::RestSet(const std::vector<int>& i, const std::vector<int>& o, const std
     t = res_chain[t-1];
     if(t <= 0) break;
   }
-
-  for(auto ii : i)
-    key.push_back(ii);
-  parentKey = key;
-  if(isIntersect)
-    parentKey.pop_back();
-  for(auto oo : o) {
-    key.push_back(oo);
-    parentKey.push_back(oo);
-  }
-  if(!isIntersect)
-    parentKey.pop_back();
-  key.push_back(res_chain[depth]);
-  if(depth>0)
-    parentKey.push_back(res_chain[depth-1]);
 
 //   std::cout << "res_chain: (";
 //   std::copy(res_chain.begin(), res_chain.end(), std::ostream_iterator<int>(std::cout, " "));
