@@ -37,8 +37,13 @@ set(USE_HPCTK OFF CACHE BOOL "Use HPCToolKit for profiling")
 set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
 set(USE_SANITIZER OFF CACHE BOOL "Use address and memory sanatizer")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
+<<<<<<< HEAD
 #set(USE_PANGOLIN ON CACHE BOOL "Install pangolin apps as well as library")
 set(USE_PANGOLIN TRUE)
+=======
+set(USE_PANGOLIN ON CACHE BOOL "Install pangolin apps as well as library")
+#set(USE_PANGOLIN TRUE)
+>>>>>>> 44a68047c71809a7a669df832504c4a2f10fdf1b
 set(USE_GPU OFF CACHE BOOL "Build Galois with GPU support")
 set(CXX_CLANG_TIDY "" CACHE STRING "Semi-colon list specifying clang-tidy command and arguments")
 set(CMAKE_CXX_COMPILER_LAUNCHER "" CACHE STRING "Semi-colon list specifying command to wrap compiler invocations (e.g., ccache)")
