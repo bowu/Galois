@@ -1,5 +1,9 @@
 #include "def.h"
 #include <iostream>
+
+
+std::map<RestSet,unsigned int> MultiRestPlan::allRestSets;
+
 MultiRestPlan::MultiRestPlan(int dep) :depth(dep){
   //everything else should be initiated automatically
 }
@@ -9,6 +13,23 @@ MultiRestPlan::~MultiRestPlan(){
     delete smsm.second;
   }
 }
+
+void MultiRestPlan::make_key(RestSet& rs) {
+  RestSet ts = rs;
+  if(ts.depth > 0) {
+    RestSet parent = ts.parent();
+    assert(allRestSets.count(parent) > 0);
+    rs.parentKey = allRestSets[parent];
+  }
+  if(allRestSets.count(ts)==0) {
+    unsigned int key = allRestSets.size();
+    allRestSets[ts] = key;
+    rs.key = key;
+  } else {
+    rs.key = allRestSets[ts];
+  }
+}
+
 void MultiRestPlan::add_ex_plan(ExecutionPlan& ep, int id){
   RestPlan rp(ep,id);
 //   std::cout << rp;
@@ -25,12 +46,18 @@ void MultiRestPlan::add_rest_plan(RestPlan& rp){
 //     std::cout << "at level: " << dep << " inserts the following restsets:\n";
 //     for(auto rs : rp.depends[dep])
 //       std::cout << rs << "\n";
-    curr->atlev.insert(rp.depends[dep].begin(),rp.depends[dep].end());
+//     curr->atlev.insert(rp.depends[dep].begin(),rp.depends[dep].end());
+    for(auto rs : rp.depends[dep]) {
+      make_key(rs);
+      curr->atlev.insert(rs);
+    }
+      
 //     std::cout << "at level: " << dep << " after inserts the restsets, atlev is:\n";
 //     for(auto rs : curr->atlev)
 //       std::cout << rs << "\n";
     RestSet lopon = rp.loopons[dep];
     if(curr->children.find(lopon)==curr->children.end()){
+      make_key(lopon);
       curr->children[lopon] = new MultiRestPlan(dep+1); 
 //       std::cout << lopon;
 //       std::cout << "\ncreating a new multi rest plan\n";
@@ -44,7 +71,9 @@ void MultiRestPlan::add_rest_plan(RestPlan& rp){
     }*/
 
   if(curr->counters.find(rp.loopons[dep])==curr->counters.end()){
-    curr->counters[rp.loopons[dep]] = npls;
+    RestSet rs = rp.loopons[dep];
+    make_key(rs);
+    curr->counters[rs] = npls;
   }
   else{
     std::cout<< "DUPLICATE PLANS ENCOUNTERED"<<std::endl;

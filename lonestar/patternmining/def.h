@@ -2,6 +2,7 @@
 #include <vector>
 #include <set>
 #include <tuple>
+#include <utility>
 #include <algorithm>
 #include <iterator>
 #include <iostream>
@@ -165,8 +166,8 @@ class RestSet{
 public:
   int depth;
   int bound;
-  std::vector<int> key;
-  std::vector<int> parentKey;
+  unsigned int key;
+  unsigned int parentKey;
   //increasing order
   std::vector<int> ins;
   bool isIntersect;
@@ -231,6 +232,8 @@ public:
   double time_complexity();
   uint32_t numPlans() { return plans.size(); }
   size_t totalDepth = 0;
+  void make_key(RestSet& rs);
+  static std::map<RestSet,unsigned int> allRestSets;
 private:
   std::vector<RestPlan> plans;
   void append_to_stream(std::ostream&, std::ostream&);
