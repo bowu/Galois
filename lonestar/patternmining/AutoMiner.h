@@ -20,6 +20,8 @@
 #include "def.h"
 #include "VertexSet.h"
 
+// #define UINT32_MAX std::numeric_limits<uint32_t>::max()
+
 
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type 
           ::with_no_lockable<true>::type Graph;
@@ -83,7 +85,7 @@ std::ostream & operator<<(std::ostream & os, const RestSet& rs)
   os << ") restriction: (";
   for(auto i : rs.res_chain)
     os << i << ",";
-  os << ")";
+  os << "), depth = " << rs.depth << ", key = " << rs.key << ", op = " << rs.op;
   return os;
 }
 
@@ -96,7 +98,7 @@ std::ostream & operator<<(std::ostream & os, RestSet& rs)
   os << ") restriction: (";
   for(auto i : rs.res_chain)
     os << i << ",";
-  os << ")";
+  os << "), depth = " << rs.depth << ", key = " << rs.key << ", op = " << rs.op;
   return os;
 }
 
@@ -132,17 +134,9 @@ class AutoMiner {
 public:
   AutoMiner(Graph* g, MultiRestPlan& p, uint32_t d) : graph(g), plan(p), maxDegree(d) { 
     accums.resize(p.numPlans()); 
-    path.resize(p.totalDepth);
-    topVsBuf.resize(MultiRestPlan::allRestSets.size());
-    otherVsBuf.resize(MultiRestPlan::allRestSets.size());
-    vsMemBuf.resize(otherVsBuf.size());
-    for(size_t i=0; i<otherVsBuf.size(); ++i)
-      vsMemBuf[i] = (uint32_t*)malloc(maxDegree*sizeof(uint32_t));
     for(auto p : MultiRestPlan::allRestSets) {
       std::cerr << "rs: " << p.first << "\n";
       std::cerr << "key: " << p.second << "\n";
-      std::cerr << "key in rs: " << p.first.key<< "\n";
-      std::cerr << "parent key: " << p.first.parentKey<< "\n";
     }
   }
 
@@ -200,59 +194,97 @@ private:
     std::fill(memBudget.begin()+1,memBudget.end(),totalMemSize/(memBudget.size()-1));
   }
 
-  //std::unique_ptr<OtherLevelVS> computeVertexSet(uint32_t node, const RestSet& rs, TopLevelVSMap& topMap, OtherLevelVSMap& otherMap) {
   std::unique_ptr<OtherLevelVS> computeVertexSet(uint32_t node, const RestSet& rs) {
 //     std::cerr << "\ncomputing vertex set for node: " << node << ", with rest set: " << rs;
     std::unique_ptr<TopLevelVS> set2 = getVSFromNode(node,std::numeric_limits<uint32_t>::max());
 //     RestSet parent = rs.parent();
-    bool intersect = rs.isIntersect;
     int  bound     = rs.bound;
+    std::unique_ptr<OtherLevelVS> result = std::make_unique<OtherLevelVS>(vsMemBuf[rs.key],0,maxDegree,-1);
     if(rs.depth == 1) {
 //       std::cerr<< "\nCurrently in topMap:" << topMap;
 //       std::cerr << "\nparent is: " << parent;
       //std::unique_ptr<TopLevelVS>& set1 = topMap.at(parent);
-      std::unique_ptr<TopLevelVS>& set1 = topVsBuf[rs.parentKey];
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
-      uint32_t resultBufSize;
-      resultBufSize = intersect ? std::min(set1->setSize,set2->setSize) : std::max(set1->setSize, set2->setSize);
-      std::unique_ptr<OtherLevelVS> result = std::make_unique<OtherLevelVS>(vsMemBuf[rs.key],0,maxDegree,-1);
 
-      if(intersect) {
-        if(bound == -1) {
-          set1->intersectNoBound(*result, *set2); 
-        } else {
-          set1->intersectWithBound(*result, *set2, path[bound]); 
+      switch(rs.op) {
+        case RestSet::intersect:
+        {
+          std::unique_ptr<TopLevelVS>& set1 = topVsBuf[rs.parentKey];
+          if(bound == -1) {
+            set1->intersectNoBound(*result, *set2); 
+          } else {
+            set1->intersectWithBound(*result, *set2, path[bound]); 
+          }
+          break;
         }
-      } else {
-        if(bound == -1) {
-          set1->differenceNoBound(*result, *set2); 
-        } else {
-          set1->differenceWithBound(*result, *set2, path[bound]); 
+        case RestSet::noParentDifference:
+        {
+          std::unique_ptr<TopLevelVS> s = getVSFromNode(path[rs.out[0]], std::numeric_limits<uint32_t>::max());
+          if(bound == -1)
+            set2->differenceNoBound(*result, *s);
+          else
+            set2->differenceWithBound(*result, *s, path[bound]); 
+          break;
         }
+        case RestSet::difference:
+        {
+          std::unique_ptr<TopLevelVS>& set1t = topVsBuf[rs.parentKey];
+          if(bound == -1) {
+            set1t->differenceNoBound(*result, *set2); 
+          } else {
+            set1t->differenceWithBound(*result, *set2, path[bound]); 
+          }
+          break;
+        }
+        default:
+          std::cerr << "op is not supported";
+          exit(1);
       }
       return result;
     } else {
 //       std::cerr<< "\nCurrently in otherMap:" << otherMap;
       //std::unique_ptr<OtherLevelVS>& set1 = otherMap.at(parent);
-      std::unique_ptr<OtherLevelVS>& set1 = otherVsBuf[rs.parentKey];
 //       std::cerr << "\nparent is: " << parent;
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
-      uint32_t resultBufSize;
-      resultBufSize = intersect ? std::min(set1->setSize,set2->setSize) : std::max(set1->setSize, set2->setSize);
       std::unique_ptr<OtherLevelVS> result = std::make_unique<OtherLevelVS>(vsMemBuf[rs.key],0,maxDegree,-1);
 
-      if(intersect) {
-        if(bound == -1) {
-          set1->intersectNoBound(*result, *set2); 
-        } else {
-          set1->intersectWithBound(*result, *set2, path[bound]); 
+      switch(rs.op) {
+        case RestSet::intersect:
+        {
+          std::unique_ptr<OtherLevelVS>& set1 = otherVsBuf[rs.parentKey];
+          if(bound == -1) {
+            set1->intersectNoBound(*result, *set2); 
+          } else {
+            set1->intersectWithBound(*result, *set2, path[bound]); 
+          }
+          break;
         }
-      } else {
-        if(bound == -1) {
-          set1->differenceNoBound(*result, *set2); 
-        } else {
-          set1->differenceWithBound(*result, *set2, path[bound]); 
+        case RestSet::noParentDifference:
+        {
+          std::unique_ptr<TopLevelVS> s = getVSFromNode(path[rs.out[0]], std::numeric_limits<uint32_t>::max());
+          set2->differenceNoBound(*result, *s);
+          for(size_t i=1; i<rs.out.size(); ++i)
+          {
+            s = getVSFromNode(path[rs.out[i]], std::numeric_limits<uint32_t>::max());
+            result->differenceNoBound(*result, *s);
+          }
+          if(bound != -1)
+            result->bound(path[bound]);
+          break;
         }
+        case RestSet::difference: 
+        {
+          std::unique_ptr<OtherLevelVS>& set1t = otherVsBuf[rs.parentKey];
+          if(bound == -1) {
+            set1t->differenceNoBound(*result, *set2); 
+          } else {
+            set1t->differenceWithBound(*result, *set2, path[bound]); 
+          }
+          break;
+        }
+        default:
+          std::cerr << "op is not supported";
+          exit(1);
       }
       return result;
     }
@@ -260,48 +292,93 @@ private:
 
   //void computeVertexSetSize(uint32_t node, RestSet rs, uint32_t index, TopLevelVSMap& topMap, OtherLevelVSMap& otherMap) {
   void computeVertexSetSize(uint32_t node, RestSet rs, uint32_t index) {
-    std::unique_ptr<TopLevelVS> set2 = getVSFromNode(node,std::numeric_limits<uint32_t>::max());
 //     std::cerr << "\ncomputing vertex set size for node: " << node << ", with rest set: " << rs << std::endl;
-    const RestSet parent = rs.parent();
-    bool intersect = rs.isIntersect;
+    std::unique_ptr<TopLevelVS> set2 = getVSFromNode(node,std::numeric_limits<uint32_t>::max());
     int  bound     = rs.bound;
     if(rs.depth == 1) {
 //       std::cerr<< "Currently in topMap:" << topMap << std::endl;
       //std::unique_ptr<TopLevelVS>& set1 = topMap.at(parent);
-      std::unique_ptr<TopLevelVS>& set1 = topVsBuf[rs.parentKey];
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
 //       std::cerr << "\n counter: " << accums[0].reduce();
-      if(intersect) {
-        if(bound == -1) {
-          accums[index] += set1->intersectNoBoundSize(*set2); 
-        } else {
-          accums[index] += set1->intersectWithBoundSize(*set2, path[bound]); 
+      switch(rs.op) {
+        case RestSet::intersect:
+        {
+          std::unique_ptr<TopLevelVS>& set1 = topVsBuf[rs.parentKey];
+          if(bound == -1) {
+            accums[index] += set1->intersectNoBoundSize(*set2); 
+          } else {
+            accums[index] += set1->intersectWithBoundSize(*set2, path[bound]); 
+          }
+          break;
         }
-      } else {
-        if(bound == -1) {
-          accums[index] += set1->differenceNoBoundSize(*set2); 
-        } else {
-          accums[index] += set1->differenceWithBoundSize(*set2, path[bound]); 
+        case RestSet::noParentDifference:
+        {
+          std::unique_ptr<TopLevelVS> s = getVSFromNode(path[rs.out[0]], std::numeric_limits<uint32_t>::max());
+          if(bound == -1)
+            accums[index] += set2->differenceNoBoundSize(*s);
+          else
+            accums[index] += set2->differenceWithBoundSize(*s, path[bound]);
+          break;
         }
+        case RestSet::difference:
+        {
+          std::unique_ptr<TopLevelVS>& set1t = topVsBuf[rs.parentKey];
+          if(bound == -1) {
+            accums[index] += set1t->differenceNoBoundSize(*set2); 
+          } else {
+            accums[index] += set1t->differenceWithBoundSize(*set2, path[bound]); 
+          }
+          break;
+        }
+        default:
+          std::cerr << "op is not supported";
+          exit(1);
       }
 //       std::cerr << "\n counter changes to : " << accums[0].reduce();
     } else {
 //       std::cerr<< "Currently in otherMap:" << otherMap << std::endl;
       //std::unique_ptr<OtherLevelVS>& set1 = otherMap.at(parent);
-      std::unique_ptr<OtherLevelVS>& set1 = otherVsBuf[rs.parentKey];
 //       std::cerr << "\n set1: " << *set1 << " set 2: " << *set2;
-      if(intersect) {
-        if(bound == -1) {
-          accums[index] += set1->intersectNoBoundSize(*set2); 
-        } else {
-          accums[index] += set1->intersectWithBoundSize(*set2, path[bound]); 
+      switch(rs.op) {
+        case RestSet::intersect:
+        {
+          std::unique_ptr<OtherLevelVS>& set1 = otherVsBuf[rs.parentKey];
+          if(bound == -1) {
+            accums[index] += set1->intersectNoBoundSize(*set2); 
+          } else {
+            accums[index] += set1->intersectWithBoundSize(*set2, path[bound]); 
+          }
+          break;
         }
-      } else {
-        if(bound == -1) {
-          accums[index] += set1->differenceNoBoundSize(*set2); 
-        } else {
-          accums[index] += set1->differenceWithBoundSize(*set2, path[bound]); 
+        case RestSet::noParentDifference:
+        {
+          std::unique_ptr<TopLevelVS> s = getVSFromNode(path[rs.out[0]], std::numeric_limits<uint32_t>::max());
+          set2->differenceNoBound(*tempVS, *s);
+          for(size_t i=1; i<rs.out.size(); ++i)
+          {
+            s = getVSFromNode(path[rs.out[i]], std::numeric_limits<uint32_t>::max());
+            tempVS->differenceNoBound(*tempVS, *s);
+          }
+          if(bound != -1)
+            tempVS->bound(path[bound]);
+          accums[index] += tempVS->setSize;
+          break;
         }
+        case RestSet::difference:
+        {
+//           std::cerr << "\nrs.depth" << rs.depth << "rs.key: " << rs.key << "rs.parentKey: " << rs.parentKey <<"\n";
+          std::unique_ptr<OtherLevelVS>& set1t = otherVsBuf[rs.parentKey];
+          if(bound == -1) {
+            accums[index] += set1t->differenceNoBoundSize(*set2); 
+          } else {
+            accums[index] += set1t->differenceWithBoundSize(*set2, path[bound]); 
+          }
+//           std::cerr << "********";
+          break;
+        }
+        default:
+          std::cerr << "op is not supported";
+          exit(1);
       }
     }
   }
@@ -319,15 +396,17 @@ private:
 //       std::cerr << "Recurse on: << " << node << ", loopon is: " << loopon;
 
       //otherMap[loopon] = computeVertexSet(node, loopon, topMap, otherMap); 
-      if(otherVsBuf[loopon.key] == nullptr)
-        otherVsBuf[loopon.key] = computeVertexSet(node, loopon);
-      for(const RestSet rs : atlev)
+      //if(otherVsBuf[loopon.key] == nullptr)
+      otherVsBuf[loopon.key] = computeVertexSet(node, loopon);
+//       std::cerr << "\n depth: " << depth << std::endl << "loopon: " << loopon << ", key: " << loopon.key << std::endl;
+      for(const RestSet rs : atlev) {
         //otherMap[rs] = computeVertexSet(node, rs, topMap, otherMap);
+//         std::cerr << "atlev: " << rs << std::endl;
         otherVsBuf[rs.key] = computeVertexSet(node, rs);
+      }
 
       //std::cerr<< otherMap;
 
-      //for(uint32_t *ptr = otherMap[loopon]->begin(); ptr!=otherMap[loopon]->end(); ++ptr) {
       for(uint32_t *ptr = otherVsBuf[loopon.key]->begin(); ptr!=otherVsBuf[loopon.key]->end(); ++ptr) {
         depthRecurse(*ptr, p.second->children);
         for(auto cp : counters) {
@@ -373,14 +452,17 @@ private:
 //         std::vector<OtherLevelVSMap> vsMap(totalDepth-1);
 //         OtherLevelVSMap vsMap; 
         //at top level, we should have 1 or 2 restsets
+
+        threadInit();
         for(RestSet rs : plan.atlev) {
           //std::cout << "*********************\n";
-          if(rs.res_chain[0] == -1)  
+          if(rs.res_chain[0] == -1) {
             //topVsMap[rs] = getVSFromNode(n, std::numeric_limits<GNode>::max());
             topVsBuf[rs.key] = getVSFromNode(n, std::numeric_limits<GNode>::max());
-          else
+          } else {
             //topVsMap[rs] = getVSFromNode(n,n);
             topVsBuf[rs.key] = getVSFromNode(n,n);
+          }
           //std::cout << rs;
           //std::cout << *(topVsMap[rs]);
           //std::cout << "*********************\n";
@@ -404,8 +486,13 @@ private:
           std::unique_ptr<TopLevelVS>& loop = topVsBuf[loopon.key];
           for(uint32_t *ptr = loop->begin(); ptr!=loop->end(); ++ptr) {
             //depthRecurse(*ptr, mp->children, topVsMap, vsMap);
-            depthRecurse(*ptr, mp->children);
             path[++depth] = *ptr;
+            for(const RestSet rs : mp->atlev) {
+              //otherMap[rs] = computeVertexSet(node, rs, topMap, otherMap);
+//               std::cerr << "atlev: " << rs << std::endl;
+              otherVsBuf[rs.key] = computeVertexSet(*ptr, rs);
+            }
+            depthRecurse(*ptr, mp->children);
             for(auto cp : counters) {
               //computeVertexSetSize(*ptr, cp.first, cp.second, topVsMap, vsMap);
               computeVertexSetSize(*ptr, cp.first, cp.second);
@@ -418,12 +505,24 @@ private:
       galois::loopname("depthFirstAlgorithm"));
   }
 
+  void threadInit() {
+    path.resize(plan.totalDepth);
+    topVsBuf.resize(MultiRestPlan::allRestSets.size());
+    otherVsBuf.resize(MultiRestPlan::allRestSets.size());
+    vsMemBuf.resize(otherVsBuf.size());
+    depth = 0;
+    tempVS = std::make_unique<OtherLevelVS>(maxDegree);
+    for(size_t i=0; i<vsMemBuf.size(); ++i)
+      vsMemBuf[i] = (uint32_t*)malloc(maxDegree*sizeof(uint32_t));
+  }
+
   Graph* graph;
-  std::vector<std::unique_ptr<TopLevelVS> > topVsBuf;
-  std::vector<std::unique_ptr<OtherLevelVS> > otherVsBuf;
-  std::vector<uint32_t*> vsMemBuf;
-  std::vector<uint32_t> path;
-  unsigned int depth = 0;
+  static thread_local std::vector<std::unique_ptr<TopLevelVS> > topVsBuf;
+  static thread_local std::vector<std::unique_ptr<OtherLevelVS> > otherVsBuf;
+  static thread_local std::vector<uint32_t*> vsMemBuf;
+  static thread_local std::vector<uint32_t> path;
+  static thread_local unsigned int depth;
+  static thread_local std::unique_ptr<OtherLevelVS> tempVS;
   MultiRestPlan& plan; 
   MiningAlgo algo = depthFirst;
   std::vector<uint64_t> memBudget;

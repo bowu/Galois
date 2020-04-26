@@ -1,2 +1,2 @@
-mineApp(sgl sgl.cpp)
-#mineApp(sgl_edge_induced sgl_edge_induced.cpp)
+add_executable(sgl sgl.cpp)
+target_link_libraries(sgl PRIVATE Galois::shmem lonestar pangolin)

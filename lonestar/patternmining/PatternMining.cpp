@@ -38,6 +38,13 @@
 #include <iostream>
 #include <fstream>
 
+thread_local std::vector<std::unique_ptr<TopLevelVS> > AutoMiner::topVsBuf;
+thread_local std::vector<std::unique_ptr<OtherLevelVS> > AutoMiner::otherVsBuf;
+thread_local std::vector<uint32_t*> AutoMiner::vsMemBuf;
+thread_local std::vector<uint32_t> AutoMiner::path;
+thread_local unsigned int AutoMiner::depth = 0;
+thread_local std::unique_ptr<OtherLevelVS> AutoMiner::tempVS;
+
 const char* name = "Pattern Mining";
 const char* desc = "Mine an arbitrary pattern in a graph";
 const char* url  = 0;
@@ -64,14 +71,16 @@ static cll::opt<Algo> algo(
         cll::init(Algo::edgeiterator));
 
 static cll::opt<MiningApp> miningApp(
-        "app", cll::desc("Choose a mining app:"),
+        "a", cll::desc("Choose a mining app:"),
         cll::values(clEnumValN(MiningApp::clique, "clique", "Clique counting"),
                     clEnumValN(MiningApp::motif, "motif", "Motif counting"),
                     clEnumValN(MiningApp::pattern, "pattern", "Pattern Matching")
         ),
         cll::init(MiningApp::clique));
 
-static cll::opt<unsigned int> patternSize("patternSize", cll::desc("Set a pattern size"), cll::init(0));
+static cll::opt<unsigned int> patternSize("k", cll::desc("Set a pattern size"), cll::init(0));
+
+// static cll::opt<unsigned int> numThreads("t", cll::desc("Set the number of threads"), cll::init(0));
 
 static cll::opt<std::string> patternFileName("patternFile", cll::desc("Specify the pattern filename"), cll::value_desc("pattern filename"), cll::init(""));
 
@@ -302,7 +311,7 @@ void readGraph(Graph& graph) {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
-  galois::setActiveThreads(1);
+  galois::setActiveThreads(numThreads);
 
   Graph graph;
 

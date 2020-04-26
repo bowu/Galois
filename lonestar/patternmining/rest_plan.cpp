@@ -17,8 +17,10 @@ RestPlan::RestPlan(ExecutionPlan& ep, int _id): id(_id), vertices(ep.vertices), 
     //    std::cout<<i<<" "<<ep.vertices<<std::endl;
     if(i!=ep.vertices-1) depends[i-1].insert(loopons[i-1]);
     
+    std::cout << "\n processing rs: " << loopons[i-1];
     RestSet curr = loopons[i-1].parent();
     while(curr.ins.size()>0){
+      std::cout << "\n parent rs: " << curr;
       depends[curr.depth].insert(curr);
       curr = curr.parent();
     }

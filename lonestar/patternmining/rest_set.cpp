@@ -7,10 +7,7 @@ RestSet::RestSet(const std::vector<int>& i, const std::vector<int>& o, const std
   if(i.size()>0) depth = std::max(depth, i[i.size()-1]);
   if(o.size()>0) depth = std::max(depth, o[o.size()-1]);
 
-  if(depth == i[i.size()-1])
-    isIntersect = true;
-  else 
-    isIntersect = false;
+  op = getSetOp(i, o);
 
   //std::copy(restrictions.begin(), restrictions.begin()+depth+2, back_inserter(restrict));
   restrict = restrictions;
@@ -29,6 +26,26 @@ RestSet::RestSet(const std::vector<int>& i, const std::vector<int>& o, const std
 //   std::copy(res_chain.begin(), res_chain.end(), std::ostream_iterator<int>(std::cout, " "));
 //   std::cout << ")\n";
   varname = var_name();
+}
+
+RestSet::SetOp RestSet::getSetOp(const std::vector<int> &i, const std::vector<int> &o) const
+{
+  int d =0;
+  bool maxInOut = false;
+  if(i.size()>0) d = std::max(d, i[i.size()-1]);
+  if(o.size()>0) {
+    if(d < o[o.size()-1]) {
+      d = o[o.size()-1];
+      maxInOut = true;
+    }
+  }
+
+  if(maxInOut) 
+    return difference;
+  else if(ins.size() != 1)
+    return intersect;
+  else
+    return noParentDifference;
 }
 
 bool RestSet::operator<(const RestSet& other) const{
@@ -83,7 +100,7 @@ int RestSet::restriction() const{
 }
 
 //adjusting this function can change how performance ends up going.
-RestSet RestSet::parent() const{
+RestSet RestSet::parent() const {
   RestSet parent = *this;
   //std::cout<<"CALLING PARENT FOR "<<varname<<std::endl;
   //highest variable value remaining
@@ -94,6 +111,7 @@ RestSet RestSet::parent() const{
     parent.res_chain.pop_back();
     parent.depth--;
     parent.varname = parent.var_name();
+    parent.op = getSetOp(parent.ins, parent.out);
     return parent;
   }
   else {
@@ -101,6 +119,7 @@ RestSet RestSet::parent() const{
     parent.res_chain.pop_back();
     parent.depth--;
     parent.varname = parent.var_name();
+    parent.op = getSetOp(parent.ins, parent.out);
     return parent;
   }
 }

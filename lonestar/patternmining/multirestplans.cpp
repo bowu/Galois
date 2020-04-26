@@ -18,8 +18,10 @@ void MultiRestPlan::make_key(RestSet& rs) {
   RestSet ts = rs;
   if(ts.depth > 0) {
     RestSet parent = ts.parent();
-    assert(allRestSets.count(parent) > 0);
-    rs.parentKey = allRestSets[parent];
+    if(allRestSets.count(parent) > 0)
+      rs.parentKey = allRestSets[parent];
+    else
+      rs.parentKey = -1;
   }
   if(allRestSets.count(ts)==0) {
     unsigned int key = allRestSets.size();
@@ -28,6 +30,8 @@ void MultiRestPlan::make_key(RestSet& rs) {
   } else {
     rs.key = allRestSets[ts];
   }
+  std::cerr << "In make_key: ";
+  std::cerr << rs << std::endl;
 }
 
 void MultiRestPlan::add_ex_plan(ExecutionPlan& ep, int id){
@@ -50,6 +54,7 @@ void MultiRestPlan::add_rest_plan(RestPlan& rp){
     for(auto rs : rp.depends[dep]) {
       make_key(rs);
       curr->atlev.insert(rs);
+      std::cerr <<"\n atlev inserts: " << rs << std::endl;
     }
       
 //     std::cout << "at level: " << dep << " after inserts the restsets, atlev is:\n";

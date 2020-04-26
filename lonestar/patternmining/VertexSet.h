@@ -34,6 +34,24 @@ private:
   VertexSet(const VertexSet&)=delete;
   VertexSet& operator=(const VertexSet&)=delete;
 
+  void boundWithSize(SizeType s, NodeTy upper) {
+    if(s > 64){
+      NodeTy idx_l = -1;
+      NodeTy idx_r = s;
+      while(idx_r-idx_l > 1){
+        NodeTy idx_t = (idx_l+idx_r)/2;
+        if(ptr[idx_t] < upper) idx_l = idx_t;
+        else idx_r = idx_t;
+      }
+      setSize = idx_l+1;
+    }else{
+      NodeTy idx_l = 0;
+
+      while(idx_l < s && ptr[idx_l] < upper) ++idx_l;
+      setSize = idx_l;
+    }
+  }
+
   //The following multiple functions need refactoring, but it should not affect
   //performance
   SizeType intersectBufNoBoundSize(NodeTy* otherPtr, SizeType otherSize) const
@@ -231,21 +249,7 @@ public:
 
   VertexSet(NodeTy* edgeBegin, NodeTy edgeListSize, NodeTy vid, NodeTy upper) : ptr(edgeBegin), bufSize(edgeListSize), fromVid(vid), isLocalAlloc(false) { 
     ptr = edgeBegin;
-    if(edgeListSize> 64){
-      NodeTy idx_l = -1;
-      NodeTy idx_r = edgeListSize;
-      while(idx_r-idx_l > 1){
-        NodeTy idx_t = (idx_l+idx_r)/2;
-        if(ptr[idx_t] < upper) idx_l = idx_t;
-        else idx_r = idx_t;
-      }
-      setSize = idx_l+1;
-    }else{
-      NodeTy idx_l = 0;
-
-      while(idx_l < edgeListSize && ptr[idx_l] < upper) ++idx_l;
-      setSize = idx_l;
-    }
+    boundWithSize(edgeListSize, upper);
   }
 
   VertexSet(VertexSet &other, NodeTy up) 
@@ -264,6 +268,11 @@ public:
 
   NodeTy* begin() { return ptr; }
   NodeTy* end() { return ptr+setSize; }
+
+  void bound(NodeTy upper) {
+    boundWithSize(setSize, upper);
+  }
+
 
   VertexSet<NodeTy,false,useNumaAlloc>& intersectNoBound(VertexSet<NodeTy,false,useNumaAlloc> &dst, const VertexSet<NodeTy,true,useNumaAlloc> &other) {
     SizeType s = intersectBufNoBound(dst.ptr, other.ptr, other.setSize);

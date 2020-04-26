@@ -164,10 +164,17 @@ public:
 
 class RestSet{
 public:
+  typedef enum {
+    intersect = 0,
+    difference,
+    noParentDifference
+  } SetOp;
+
+  SetOp op;
   int depth;
   int bound;
   unsigned int key;
-  unsigned int parentKey;
+  int parentKey;
   //increasing order
   std::vector<int> ins;
   bool isIntersect;
@@ -188,6 +195,7 @@ public:
   double data_complexity_ignoring_restrictions() const;
   double time_complexity_ignoring_restrictions() const;
   double time_complexity_ignoring_restrictions(bool,std::set<RestSet>&) const;
+  SetOp getSetOp(const std::vector<int> &ins, const std::vector<int> &out) const;
   friend std::ostream & operator<<(std::ostream & os, RestSet& rs) ;
 private:
   std::string var_name();
