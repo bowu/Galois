@@ -38,12 +38,11 @@
 #include <iostream>
 #include <fstream>
 
-thread_local std::vector<std::unique_ptr<TopLevelVS> > AutoMiner::topVsBuf;
-thread_local std::vector<std::unique_ptr<OtherLevelVS> > AutoMiner::otherVsBuf;
+thread_local std::vector<VSPtr> AutoMiner::vsBuf;
 thread_local std::vector<uint32_t*> AutoMiner::vsMemBuf;
-thread_local std::vector<uint32_t> AutoMiner::path;
-thread_local unsigned int AutoMiner::depth = 0;
-thread_local std::unique_ptr<OtherLevelVS> AutoMiner::tempVS;
+thread_local std::vector<AutoMiner::PerLevelContext> AutoMiner::path;
+thread_local unsigned int AutoMiner::curLevel= 0;
+thread_local VSPtr AutoMiner::tempVS;
 
 const char* name = "Pattern Mining";
 const char* desc = "Mine an arbitrary pattern in a graph";
